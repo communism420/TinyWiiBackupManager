@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 use crate::{
-    games::{export::ExportFormat, game::Game, import::sanitize_title, keep_valid_games},
+    games::{game::Game, import::sanitize_title, keep_valid_games},
     message::Message,
     util::fs::recursive_file_scan,
 };
@@ -23,14 +23,22 @@ const GAME_EXTS: &[&str] = &[
     "ISO", "GCM", "WIA", "RVZ", "WBFS", "CISO", "GZC", "TGC",
 ];
 
-#[cfg(all(windows, feature = "dialogs-tfd"))]
-mod windows_save;
+#[rustfmt::skip]
+const LOWERCASE_GAME_EXTS: &[&str] = &[
+    "iso", "gcm", "wia", "rvz", "wbfs", "ciso", "gcz", "tgc",
+];
 
 #[rustfmt::skip]
 const WIILOAD_EXTS: &[&str] = &[
     "zip", "dol", "elf",
     "ZIP", "DOL", "ELF",
 ];
+
+mod save_formats;
+use save_formats::SaveFormat;
+
+#[cfg(all(windows, feature = "dialogs-tfd"))]
+mod windows_save;
 
 #[cfg(feature = "dialogs-rfd")]
 type Base = rfd::AsyncFileDialog;
@@ -116,9 +124,14 @@ async fn pick_files(
 }
 
 #[cfg(feature = "dialogs-rfd")]
-async fn save_file(base: Base, title: &'static str, filename: String) -> Option<PathBuf> {
+async fn save_file(
+    base: Base,
+    title: &'static str,
+    filename: String,
+    _filter: (&'static [&str], &'static str),
+) -> Option<PathBuf> {
     let mut dialog = base.set_title(title).set_file_name(filename);
-    for format in ExportFormat::ALL {
+    for format in SaveFormat::ALL {
         dialog = dialog.add_filter(
             format!("{format} (*.{})", format.extension()),
             &[format.extension()],
@@ -128,16 +141,26 @@ async fn save_file(base: Base, title: &'static str, filename: String) -> Option<
 }
 
 #[cfg(all(windows, feature = "dialogs-tfd"))]
-async fn save_file(_base: Base, title: &'static str, filename: String) -> Option<PathBuf> {
+async fn save_file(
+    _base: Base,
+    title: &'static str,
+    filename: String,
+    _filter: (&'static [&str], &'static str),
+) -> Option<PathBuf> {
     // tinyfiledialogs only supports a single combined filter. The native Windows
     // dialog exposes the individual export formats and updates their extensions.
     smol::unblock(move || windows_save::save_game_file(title, &filename)).await
 }
 
 #[cfg(all(not(windows), feature = "dialogs-tfd"))]
-async fn save_file(_base: Base, title: &'static str, filename: String) -> Option<PathBuf> {
+async fn save_file(
+    _base: Base,
+    title: &'static str,
+    filename: String,
+    _filter: (&'static [&str], &'static str),
+) -> Option<PathBuf> {
     smol::unblock(move || {
-        let patterns = ExportFormat::ALL.map(|format| format!("*.{}", format.extension()));
+        let patterns = SaveFormat::ALL.map(|format| format!("*.{}", format.extension()));
         let patterns = patterns.each_ref().map(String::as_str);
         tinyfiledialogs::save_file_dialog_with_filter(title, &filename, &patterns, "Wii/NGC rom")
     })
@@ -173,19 +196,22 @@ pub fn make_pick_in_out_dialogs_task(base: Base) -> Task<Message> {
     Task::perform(
         async move {
             let in_path = pick_file(
-                #[cfg(feature = "dialogs-rfd")]
                 base.clone(),
-                #[cfg(feature = "dialogs-tfd")]
-                (),
                 "Select Game to convert",
                 (GAME_EXTS, "Wii/NGC rom"),
             )
             .await?;
 
             let file_stem = in_path.file_stem().and_then(OsStr::to_str)?;
-            let rvz_filename = format!("{file_stem}.{}", ExportFormat::default().extension());
+            let rvz_filename = format!("{file_stem}.rvz");
 
-            let out_path = save_file(base, "Save converted game to", rvz_filename).await?;
+            let out_path = save_file(
+                base,
+                "Save converted game to",
+                rvz_filename,
+                (LOWERCASE_GAME_EXTS, "Wii/NGC rom"),
+            )
+            .await?;
 
             Some((in_path, out_path))
         },
@@ -234,14 +260,16 @@ pub fn make_pick_games_recursively_dialog_task(
 
 pub fn make_pick_export_game_dest_dialog_task(base: Base, game: Game) -> Task<Message> {
     let ascii_title = twbm_idmap::get_ascii_title(game.id()).unwrap_or(game.title());
-    let filename = format!(
-        "{}.{}",
-        sanitize_title(ascii_title),
-        ExportFormat::default().extension()
-    );
+    let filename = sanitize_title(ascii_title) + ".rvz";
+
     Task::perform(
-        save_file(base, "Select where you want to export the game", filename),
-        move |path| match path {
+        save_file(
+            base,
+            "Select where you want to export the game",
+            filename,
+            (LOWERCASE_GAME_EXTS, "Wii/NGC rom"),
+        ),
+        move |opt| match opt {
             Some(path) => Message::ExportGame(game, path),
             None => Message::NoOp,
         },

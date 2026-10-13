@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Manuel Quarneti <mq1@ik.me>
 // SPDX-License-Identifier: GPL-3.0-only
 
-use crate::games::export::ExportFormat;
+use super::SaveFormat;
 use std::{ffi::OsString, os::windows::ffi::OsStringExt, path::PathBuf};
 use windows_sys::Win32::UI::Controls::Dialogs::{
     CommDlgExtendedError, GetSaveFileNameW, OFN_EXPLORER, OFN_NOCHANGEDIR, OFN_OVERWRITEPROMPT,
@@ -13,14 +13,14 @@ pub(super) fn save_game_file(title: &str, filename: &str) -> Option<PathBuf> {
     // Keep the legacy Windows dialog API so the x86/x64 builds still support XP.
     // Unlike tinyfiledialogs, it exposes a separate entry for every output format.
     let mut filters = Vec::new();
-    for format in ExportFormat::ALL {
+    for format in SaveFormat::ALL {
         let extension = format.extension();
         filters.extend(format!("{format} (*.{extension})\0*.{extension}\0").encode_utf16());
     }
     filters.push(0);
 
     let title: Vec<_> = title.encode_utf16().chain(Some(0)).collect();
-    let default_extension: Vec<_> = ExportFormat::default()
+    let default_extension: Vec<_> = SaveFormat::default()
         .extension()
         .encode_utf16()
         .chain(Some(0))
