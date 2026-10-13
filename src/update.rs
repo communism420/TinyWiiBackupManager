@@ -9,7 +9,6 @@ use crate::{
         convert::convert_game,
         export::{MAX_PARALLEL_EXPORTS, export_game, export_games},
         games_state::GamesState,
-        import::{BatchImportEvent, MAX_PARALLEL_IMPORTS},
         scrub::scrub_game,
         txtcodes::download_cheats,
     },
@@ -263,11 +262,14 @@ impl AppState {
             }
             Message::SetImportParallelJobs(jobs) => {
                 if !self.is_import_busy() {
-                    self.import_parallel_jobs = jobs.clamp(1, MAX_PARALLEL_IMPORTS);
+                    self.import_parallel_jobs =
+                        jobs.clamp(1, crate::games::import::MAX_PARALLEL_IMPORTS);
                 }
                 Task::none()
             }
             Message::ImportBatchUpdated(run_id, event) => {
+                use crate::games::import::BatchImportEvent;
+
                 let Some(run) = &mut self.active_import else {
                     return Task::none();
                 };

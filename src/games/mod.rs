@@ -25,6 +25,7 @@ pub mod import;
 pub mod scrub;
 pub mod transfer;
 pub mod txtcodes;
+pub(crate) mod zip_image;
 
 #[derive(Debug, Clone)]
 pub struct ImportEntry {
