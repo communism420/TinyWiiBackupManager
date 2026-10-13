@@ -8,8 +8,8 @@ use crate::{
     ui::{
         components::{notifications::notifications, sidebar::sidebar},
         modals::{
-            Modal, check_games::check_games, confirm_scub::confirm_scrub, delete_dir::delete_dir,
-            game_info::game_info, homebrew_app_info::homebrew_app_info, osc_app_info::osc_app_info,
+            Modal, confirm_scub::confirm_scrub, delete_dir::delete_dir, game_info::game_info,
+            homebrew_app_info::homebrew_app_info, osc_app_info::osc_app_info,
         },
         pages::{
             Page, about::about, games::games, homebrew_apps::homebrew_apps,
@@ -45,6 +45,14 @@ pub fn view(state: &AppState) -> Element<'_, Message> {
         state.current_modal.as_ref().map(|modal| {
             opaque(
                 container(match modal {
+                    Modal::CheckGames => match &state.hash_batch {
+                        Some(selection) => crate::ui::modals::check_games::check_games(
+                            selection,
+                            state.is_hash_busy(),
+                            matches!(&state.games, crate::games::games_state::GamesState::Loaded(games) if games.count() > 0),
+                        ),
+                        None => iced::widget::space().into(),
+                    },
                     Modal::GameInfo((game, disc_info, scrubbable)) => {
                         game_info(game, disc_info.as_ref(), *scrubbable, state)
                     }
@@ -52,14 +60,6 @@ pub fn view(state: &AppState) -> Element<'_, Message> {
                     Modal::OscAppInfo(app) => osc_app_info(app),
                     Modal::DeleteDir(path) => delete_dir(path),
                     Modal::ConfirmScrub(game) => confirm_scrub(game),
-                    Modal::CheckGames => match &state.hash_batch {
-                        Some(selection) => check_games(
-                            selection,
-                            state.is_hash_busy(),
-                            matches!(&state.games, crate::games::games_state::GamesState::Loaded(games) if games.count() > 0),
-                        ),
-                        None => iced::widget::space().into(),
-                    },
                 })
                 .center(Length::Fill)
                 .style(|theme: &Theme| container::Style {

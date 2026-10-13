@@ -27,6 +27,14 @@ pub fn game_info<'a>(
     scrubbable: bool,
     state: &'a AppState,
 ) -> Element<'a, Message> {
+    let mut hash_btn = my_button()
+        .label("SHA1")
+        .icon(Icon::SearchCheck)
+        .kind(MyButtonKind::Secondary);
+    if !state.is_hash_busy() {
+        hash_btn = hash_btn.on_press_with(|| Message::CalcGameSha1(game.clone()));
+    }
+
     let content: Element<'a, _> = if let Some(disc_info) = disc_info {
         row![
             column![
@@ -88,14 +96,6 @@ pub fn game_info<'a>(
             tooltip::Position::Bottom,
         )
     });
-
-    let mut hash_btn = my_button()
-        .label("SHA1")
-        .icon(Icon::SearchCheck)
-        .kind(MyButtonKind::Secondary);
-    if !state.is_hash_busy() {
-        hash_btn = hash_btn.on_press_with(|| Message::CalcGameSha1(game.clone()));
-    }
 
     my_card(
         column![

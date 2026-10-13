@@ -4,13 +4,8 @@
 use crate::{
     config::message::ConfigMessage,
     games::{
-        ImportEntry,
-        calc_sha1::{BatchHashEvent, calc_sha1, calc_sha1_games},
-        convert::convert_game,
-        export::export_game,
-        games_state::GamesState,
-        scrub::scrub_game,
-        txtcodes::download_cheats,
+        ImportEntry, calc_sha1::calc_sha1, convert::convert_game, export::export_game,
+        games_state::GamesState, scrub::scrub_game, txtcodes::download_cheats,
     },
     homebrew::homebrew_state::HomebrewState,
     long_operation::{LongOperationKind, LongOperationState},
@@ -218,7 +213,7 @@ impl AppState {
                         LongOperationState::Progress(selection.progress.clone()),
                     );
                 }
-                Task::stream(calc_sha1_games(games))
+                Task::stream(crate::games::calc_sha1::calc_sha1_games(games))
                     .map(move |event| Message::HashBatchUpdated(run_id, event))
             }
             Message::HashBatchUpdated(run_id, event) => {
@@ -229,15 +224,17 @@ impl AppState {
                     return Task::none();
                 }
                 match event {
-                    BatchHashEvent::Progress(progress) => {
+                    crate::games::calc_sha1::BatchHashEvent::Progress(progress) => {
                         selection.progress = progress.clone();
                         self.long_operations.set(
                             LongOperationKind::Hash,
                             LongOperationState::Progress(progress),
                         );
                     }
-                    BatchHashEvent::Result(result) => selection.results.push(result),
-                    BatchHashEvent::Finished(summary) => {
+                    crate::games::calc_sha1::BatchHashEvent::Result(result) => {
+                        selection.results.push(result)
+                    }
+                    crate::games::calc_sha1::BatchHashEvent::Finished(summary) => {
                         let notification = if summary.errors > 0 {
                             Notification::error(&summary)
                         } else if summary.unknown > 0 {
