@@ -7,11 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed
-
-- Reduced the size of UI messages and modal state by boxing the Homebrew app details payload.
-- Removed redundant cloning of the empty legacy dialog context while preserving context reuse with modern file dialogs.
-
 ## [v6.1.7] - 2026-10-13
 
 ## Fixed
