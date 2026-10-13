@@ -4,13 +4,8 @@
 use crate::{
     config::message::ConfigMessage,
     games::{
-        ImportEntry,
-        calc_sha1::calc_sha1,
-        convert::convert_game,
-        export::{MAX_PARALLEL_EXPORTS, export_game, export_games},
-        games_state::GamesState,
-        scrub::scrub_game,
-        txtcodes::download_cheats,
+        ImportEntry, calc_sha1::calc_sha1, convert::convert_game, export::export_game,
+        games_state::GamesState, scrub::scrub_game, txtcodes::download_cheats,
     },
     homebrew::homebrew_state::HomebrewState,
     long_operation::{LongOperationKind, LongOperationState},
@@ -30,6 +25,17 @@ const NEW_DRIVE_TEXT: &str = "New drive detected (or a breaking TWBM update has 
 
 impl AppState {
     pub fn update(&mut self, message: Message) -> Task<Message> {
+        let fast_transfer_locked = !self.can_change_fast_transfer();
+        match &message {
+            Message::Config(ConfigMessage::SetMountPoint(_)) | Message::MountPointPicked(_) => {
+                self.dismiss_export_selection();
+            }
+            Message::GotConfig(config) if self.config.mount_point() != config.mount_point() => {
+                self.dismiss_export_selection();
+            }
+            _ => {}
+        }
+
         match message {
             Message::Config(message) => {
                 if matches!(message, ConfigMessage::SetFastTransfer(_))
@@ -38,7 +44,6 @@ impl AppState {
                     return Task::none();
                 }
                 match &message {
-                    ConfigMessage::SetMountPoint(_) => self.dismiss_export_selection(),
                     ConfigMessage::Written(Err(e)) => {
                         self.notifications.push(Notification::error(e));
                     }
@@ -68,30 +73,24 @@ impl AppState {
             Message::PickMountPoint => {
                 dialogs::init_file_dialog_task().then(dialogs::make_pick_mount_point_dialog_task)
             }
-            Message::MountPointPicked(path) => {
-                self.dismiss_export_selection();
-                Task::batch([
-                    self.config
-                        .update(ConfigMessage::SetMountPoint(path))
-                        .map(Message::Config),
-                    self.refresh_games_and_apps(),
-                ])
-            }
+            Message::MountPointPicked(path) => Task::batch([
+                self.config
+                    .update(ConfigMessage::SetMountPoint(path))
+                    .map(Message::Config),
+                self.refresh_games_and_apps(),
+            ]),
             Message::CloseNotification(idx) => {
                 self.notifications.close(idx);
                 Task::none()
             }
             Message::RefreshGamesAndApps => self.refresh_games_and_apps(),
             Message::GotConfig(mut config) => {
-                if !self.can_change_fast_transfer() {
+                if fast_transfer_locked {
                     // A delayed configuration load cannot change the setting shown
                     // for a running transfer or a pending native destination dialog.
                     drop(
                         config.update(ConfigMessage::SetFastTransfer(self.config.fast_transfer())),
                     );
-                }
-                if self.config.mount_point() != config.mount_point() {
-                    self.dismiss_export_selection();
                 }
                 self.config = config;
                 self.refresh_games_and_apps()
@@ -456,6 +455,8 @@ impl AppState {
                 self.notifications.push(notification);
                 Task::none()
             }
+            // Export events require the run ID to reject stale tasks.
+            Message::SetLongOperationState(LongOperationKind::Export, _) => Task::none(),
             Message::OpenExportGames => {
                 if !self.is_export_busy()
                     && !self.config.mount_point().as_os_str().is_empty()
@@ -496,7 +497,8 @@ impl AppState {
                 if self.export_picker.is_none()
                     && let Some(Modal::ExportGames(selection)) = &mut self.current_modal
                 {
-                    selection.parallel_jobs = parallel_jobs.clamp(1, MAX_PARALLEL_EXPORTS);
+                    selection.parallel_jobs =
+                        parallel_jobs.clamp(1, crate::games::export::MAX_PARALLEL_EXPORTS);
                 }
                 Task::none()
             }
@@ -537,7 +539,7 @@ impl AppState {
                         games.len()
                     )),
                 );
-                Task::stream(export_games(
+                Task::stream(crate::games::export::export_games(
                     games,
                     destination,
                     format,
@@ -548,10 +550,7 @@ impl AppState {
                 .map(move |op_state| Message::ExportProgress(run.id, op_state))
             }
             Message::SetLongOperationState(op_kind, mut op_state) => {
-                if matches!(
-                    op_kind,
-                    LongOperationKind::Import | LongOperationKind::Export
-                ) {
+                if op_kind == LongOperationKind::Import {
                     // Batch events require the run ID so an old task cannot unlock a new run.
                     return Task::none();
                 }

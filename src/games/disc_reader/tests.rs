@@ -37,11 +37,9 @@ fn large_part_lengths_do_not_truncate_small_reads() {
     first.write_all(b"first123").unwrap();
     second.write_all(b"second45").unwrap();
     for first_length in [1u64 << 32, (1u64 << 32) + 1] {
-        let mut reader = SharedMultiFileReader::new([
-            first.try_clone().unwrap(),
-            second.try_clone().unwrap(),
-        ])
-        .unwrap();
+        let mut reader =
+            SharedMultiFileReader::new([first.try_clone().unwrap(), second.try_clone().unwrap()])
+                .unwrap();
         // Model a large recorded extent without allocating a 4 GiB fixture.
         // Only the real prefixes of each backing file are read below.
         reader.inner[0].1 = first_length;
@@ -142,8 +140,7 @@ fn cancellable_zip_extraction_preserves_source_and_contents() {
     let mut source = tempfile::Builder::new().suffix(".zip").tempfile().unwrap();
     source.write_all(&archive).unwrap();
     let files =
-        retrieve_multi_disc_files_cancellable(source.path(), &TestCancellation::default())
-            .unwrap();
+        retrieve_multi_disc_files_cancellable(source.path(), &TestCancellation::default()).unwrap();
     let mut stream = SharedMultiFileReader::new(files).unwrap();
     assert_eq!(stream.stream_len().unwrap(), data.len() as u64);
     let mut extracted = vec![0; data.len()];
@@ -173,8 +170,7 @@ fn cancellation_during_zip_read_stops_before_writing_extracted_chunk() {
         cancel: cancel.clone(),
     };
     let mut output = Vec::new();
-    let error =
-        retrieve::copy_with_check(&mut reader, &mut output, || cancel.check()).unwrap_err();
+    let error = retrieve::copy_with_check(&mut reader, &mut output, || cancel.check()).unwrap_err();
     assert_eq!(error.kind(), io::ErrorKind::Other);
     assert!(output.is_empty());
 }
