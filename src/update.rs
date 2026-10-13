@@ -25,7 +25,13 @@ const NEW_DRIVE_TEXT: &str = "New drive detected (or a breaking TWBM update has 
 
 impl AppState {
     pub fn update(&mut self, message: Message) -> Task<Message> {
-        let fast_transfer_locked = !self.can_change_fast_transfer();
+        let mut message = message;
+        if let Message::GotConfig(config) = &mut message
+            && !self.can_change_fast_transfer()
+        {
+            // Preserve the setting before mount changes can dismiss a busy picker.
+            drop(config.update(ConfigMessage::SetFastTransfer(self.config.fast_transfer())));
+        }
         match &message {
             Message::Config(ConfigMessage::SetMountPoint(_)) | Message::MountPointPicked(_) => {
                 self.dismiss_export_selection();
@@ -84,14 +90,7 @@ impl AppState {
                 Task::none()
             }
             Message::RefreshGamesAndApps => self.refresh_games_and_apps(),
-            Message::GotConfig(mut config) => {
-                if fast_transfer_locked {
-                    // A delayed configuration load cannot change the setting shown
-                    // for a running transfer or a pending native destination dialog.
-                    drop(
-                        config.update(ConfigMessage::SetFastTransfer(self.config.fast_transfer())),
-                    );
-                }
+            Message::GotConfig(config) => {
                 self.config = config;
                 self.refresh_games_and_apps()
             }
