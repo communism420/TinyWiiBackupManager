@@ -19,6 +19,8 @@ pub mod convert;
 pub mod covers;
 pub mod disc_reader;
 pub mod export;
+#[cfg(test)]
+mod format_recognition_tests;
 pub mod game;
 pub mod games_state;
 pub mod import;
