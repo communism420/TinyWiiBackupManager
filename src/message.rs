@@ -3,7 +3,7 @@
 
 use crate::{
     config::{Config, message::ConfigMessage},
-    games::{ImportEntry, export::ExportFormat, game::Game, games_state::GamesState},
+    games::{ImportEntry, game::Game, games_state::GamesState},
     homebrew::{homebrew_app::HomebrewApp, homebrew_state::HomebrewState},
     long_operation::{LongOperationKind, LongOperationState},
     notifications::notification::Notification,
@@ -64,7 +64,7 @@ pub enum Message {
     OpenExportGames,
     ToggleExportGame(usize, bool),
     SelectAllExportGames(bool),
-    SetExportFormat(ExportFormat),
+    SetExportFormat(crate::games::export::ExportFormat),
     SetExportParallelJobs(usize),
     PickBatchExportDestination,
     BatchExportDestinationPicked(u64, Option<PathBuf>),

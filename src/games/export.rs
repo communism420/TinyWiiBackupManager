@@ -204,14 +204,14 @@ impl std::fmt::Display for ExportFormat {
 }
 
 pub fn ext_to_format(ext: &str) -> Option<Format> {
-    match ext.to_ascii_lowercase().as_str() {
-        "iso" => Some(Format::Iso),
-        "ciso" => Some(Format::Ciso),
-        "gcz" => Some(Format::Gcz),
-        "rvz" => Some(Format::Rvz),
-        "wbfs" => Some(Format::Wbfs),
-        "wia" => Some(Format::Wia),
-        "tgc" => Some(Format::Tgc),
+    match ext {
+        "iso" | "ISO" => Some(Format::Iso),
+        "ciso" | "CISO" => Some(Format::Ciso),
+        "gcz" | "CGZ" => Some(Format::Gcz),
+        "rvz" | "RVZ" => Some(Format::Rvz),
+        "wbfs" | "WBFS" => Some(Format::Wbfs),
+        "wia" | "WIA" => Some(Format::Wia),
+        "tgc" | "TGC" => Some(Format::Tgc),
         _ => None,
     }
 }
