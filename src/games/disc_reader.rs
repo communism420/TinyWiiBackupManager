@@ -1,18 +1,13 @@
 // SPDX-FileCopyrightText: 2026 Manuel Quarneti <mq1@ik.me>
 // SPDX-License-Identifier: GPL-3.0-only
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use arrayvec::ArrayVec;
 use nod::read::DiscStream;
-use std::{
-    ffi::OsStr,
-    fs::File,
-    io::{self, Read, Write},
-    path::Path,
-    sync::Arc,
-};
-use tempfile::tempfile;
-use zip::ZipArchive;
+use std::{fs::File, io, sync::Arc};
+
+mod retrieve;
+pub use retrieve::retrieve_multi_disc_files;
 
 #[cfg(unix)]
 use std::os::unix::fs::FileExt;
@@ -54,55 +49,7 @@ pub struct SharedMultiFileReader {
     stream_len: u64,
 }
 
-impl SharedMultiFileReader {
-    pub fn new(files: impl IntoIterator<Item = File>) -> Result<Self> {
-        let mut inner = ArrayVec::new();
-        let mut stream_len = 0;
-
-        for file in files {
-            let size = file.metadata()?.len();
-            inner.push((Arc::new(file), size));
-            stream_len += size;
-        }
-
-        Ok(Self { inner, stream_len })
-    }
-}
-
-impl DiscStream for SharedMultiFileReader {
-    fn stream_len(&mut self) -> io::Result<u64> {
-        Ok(self.stream_len)
-    }
-
-    fn read_exact_at(&mut self, buf: &mut [u8], offset: u64) -> io::Result<()> {
-        let mut offset = offset;
-        let mut buf = buf;
-
-        for (file, len) in self.inner.iter() {
-            // If the offset is past the end of the file, skip it
-            if offset >= *len {
-                offset -= len;
-                continue;
-            }
-
-            // Limit in u64 before narrowing: a single ISO may exceed usize on x86.
-            let n = (*len - offset).min(buf.len() as u64) as usize;
-            file.read_exact_at(&mut buf[..n], offset)?;
-            buf = &mut buf[n..];
-            offset = 0;
-
-            if buf.is_empty() {
-                return Ok(());
-            }
-        }
-
-        if buf.is_empty() {
-            Ok(())
-        } else {
-            Err(io::ErrorKind::UnexpectedEof.into())
-        }
-    }
-}
+use std::path::Path;
 
 pub trait DiscCancellation: Clone + Send + Sync {
     fn check(&self) -> io::Result<()>;
@@ -131,15 +78,6 @@ pub(crate) fn error_contains<E: std::error::Error + 'static>(
         return error_contains::<E>(inner);
     }
     error.source().is_some_and(error_contains::<E>)
-}
-
-#[derive(Clone)]
-struct NoCancellation;
-
-impl DiscCancellation for NoCancellation {
-    fn check(&self) -> io::Result<()> {
-        Ok(())
-    }
 }
 
 /// Keeps cancellation active when nod clones a stream for its worker threads.
@@ -179,127 +117,38 @@ impl<C: DiscCancellation + 'static> DiscStream for CancellableDiscStream<C> {
     }
 }
 
-fn copy_cancellable<C: DiscCancellation>(
-    reader: &mut impl Read,
-    writer: &mut impl Write,
-    cancel: &C,
-) -> io::Result<()> {
-    let mut buffer = vec![0; 1024 * 1024];
-    loop {
-        cancel.check()?;
-        let read = reader.read(&mut buffer)?;
-        cancel.check()?;
-        if read == 0 {
-            return Ok(());
-        }
-        writer.write_all(&buffer[..read])?;
-        cancel.check()?;
-    }
-}
-
-pub fn retrieve_multi_disc_files(path: &Path) -> Result<ArrayVec<File, 4>> {
-    retrieve_multi_disc_files_inner::<NoCancellation>(path, None)
-}
-
 pub fn retrieve_multi_disc_files_cancellable<C: DiscCancellation>(
     path: &Path,
     cancel: &C,
 ) -> Result<ArrayVec<File, 4>> {
-    retrieve_multi_disc_files_inner(path, Some(cancel))
+    retrieve::retrieve_multi_disc_files_with_check(path, || cancel.check())
 }
 
-fn retrieve_multi_disc_files_inner<C: DiscCancellation>(
-    path: &Path,
-    cancel: Option<&C>,
-) -> Result<ArrayVec<File, 4>> {
-    let check = || cancel.map_or(Ok(()), DiscCancellation::check);
-    let open = |path: &Path| -> io::Result<File> {
-        check()?;
-        let file = File::open(path)?;
-        check()?;
-        Ok(file)
-    };
-    check()?;
-    let mut files = ArrayVec::new();
+impl SharedMultiFileReader {
+    pub fn new(files: impl IntoIterator<Item = File>) -> Result<Self> {
+        let mut inner = ArrayVec::new();
+        let mut stream_len = 0;
 
-    let ext = path.extension().context("invalid extension")?;
-
-    if ext.eq_ignore_ascii_case("zip") {
-        let mut zip = ZipArchive::new(open(path)?)?;
-        check()?;
-        let mut entry = zip.by_index(0)?;
-        check()?;
-
-        let mut tmp = tempfile()?;
-        check()?;
-        if let Some(cancel) = cancel {
-            copy_cancellable(&mut entry, &mut tmp, cancel)?;
-        } else {
-            io::copy(&mut entry, &mut tmp)?;
+        for file in files {
+            let size = file.metadata()?.len();
+            inner.push((Arc::new(file), size));
+            stream_len += size;
         }
-        check()?;
-        tmp.flush()?;
-        check()?;
 
-        files.push(tmp);
-    } else {
-        let filename = path
-            .file_name()
-            .and_then(OsStr::to_str)
-            .context("invalid filename")?;
-
-        files.push(open(path)?);
-
-        if let Some(filename) = filename.strip_suffix(".part0.iso") {
-            for i in 1..=3 {
-                check()?;
-                let part_path = path.with_file_name(format!("{filename}.part{i}.iso"));
-                if i > 1 && !part_path.exists() {
-                    break;
-                }
-                files.push(open(&part_path)?);
-            }
-        } else if let Some(filename) = filename.strip_suffix(".PART0.ISO") {
-            for i in 1..=3 {
-                check()?;
-                let part_path = path.with_file_name(format!("{filename}.PART{i}.ISO"));
-                if i > 1 && !part_path.exists() {
-                    break;
-                }
-                files.push(open(&part_path)?);
-            }
-        } else if let Some(filename) = filename.strip_suffix(".wbfs") {
-            for i in 1..=3 {
-                check()?;
-                let wbfx_path = path.with_file_name(format!("{filename}.wbf{i}"));
-                if !wbfx_path.exists() {
-                    break;
-                }
-                files.push(open(&wbfx_path)?);
-            }
-        } else if let Some(filename) = filename.strip_suffix(".WBFS") {
-            for i in 1..=3 {
-                check()?;
-                let wbfx_path = path.with_file_name(format!("{filename}.WBF{i}"));
-                if !wbfx_path.exists() {
-                    break;
-                }
-                files.push(open(&wbfx_path)?);
-            }
-        }
+        Ok(Self { inner, stream_len })
     }
-
-    check()?;
-    Ok(files)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::{Read, Write};
     use std::{
         io::Cursor,
         sync::atomic::{AtomicBool, Ordering},
     };
+    use tempfile::tempfile;
+    use zip::ZipArchive;
 
     #[derive(Clone, Default)]
     struct TestCancellation(Arc<AtomicBool>);
@@ -320,6 +169,32 @@ mod tests {
         }
     }
     use zip::{ZipWriter, write::SimpleFileOptions};
+
+    #[test]
+    fn large_part_lengths_do_not_truncate_small_reads() {
+        let mut first = tempfile().unwrap();
+        let mut second = tempfile().unwrap();
+        first.write_all(b"first123").unwrap();
+        second.write_all(b"second45").unwrap();
+        for first_length in [1u64 << 32, (1u64 << 32) + 1] {
+            let mut reader = SharedMultiFileReader::new([
+                first.try_clone().unwrap(),
+                second.try_clone().unwrap(),
+            ])
+            .unwrap();
+            // Model a large recorded extent without allocating a 4 GiB fixture.
+            // Only the real prefixes of each backing file are read below.
+            reader.inner[0].1 = first_length;
+            reader.stream_len = first_length + 8;
+            assert_eq!(reader.stream_len().unwrap(), first_length + 8);
+
+            let mut actual = [0u8; 8];
+            reader.read_exact_at(&mut actual, 0).unwrap();
+            assert_eq!(&actual, b"first123", "first part length {first_length}");
+            reader.read_exact_at(&mut actual, first_length).unwrap();
+            assert_eq!(&actual, b"second45");
+        }
+    }
 
     #[test]
     fn split_iso_reads_two_and_three_parts() {
@@ -438,8 +313,44 @@ mod tests {
             cancel: cancel.clone(),
         };
         let mut output = Vec::new();
-        let error = copy_cancellable(&mut reader, &mut output, &cancel).unwrap_err();
+        let error =
+            retrieve::copy_with_check(&mut reader, &mut output, || cancel.check()).unwrap_err();
         assert_eq!(error.kind(), io::ErrorKind::Other);
         assert!(output.is_empty());
+    }
+}
+
+impl DiscStream for SharedMultiFileReader {
+    fn stream_len(&mut self) -> io::Result<u64> {
+        Ok(self.stream_len)
+    }
+
+    fn read_exact_at(&mut self, buf: &mut [u8], offset: u64) -> io::Result<()> {
+        let mut offset = offset;
+        let mut buf = buf;
+
+        for (file, len) in self.inner.iter() {
+            // If the offset is past the end of the file, skip it
+            if offset >= *len {
+                offset -= len;
+                continue;
+            }
+
+            // Limit in u64 before narrowing: a single ISO may exceed usize on x86.
+            let n = (*len - offset).min(buf.len() as u64) as usize;
+            file.read_exact_at(&mut buf[..n], offset)?;
+            buf = &mut buf[n..];
+            offset = 0;
+
+            if buf.is_empty() {
+                return Ok(());
+            }
+        }
+
+        if buf.is_empty() {
+            Ok(())
+        } else {
+            Err(io::ErrorKind::UnexpectedEof.into())
+        }
     }
 }
