@@ -56,22 +56,22 @@ fn progress<'a>(
     (op_state, kind): &'a (LongOperationState, LongOperationKind),
     state: &AppState,
 ) -> impl Iterator<Item = Element<'a, Message>> {
-    if let LongOperationState::Progress(progress) = op_state
-        && *kind == LongOperationKind::Export
-        && state.active_export.is_some()
-    {
-        let content = row![
-            text(progress.as_str()),
-            button("Cancel export")
-                .on_press_maybe((!state.is_export_cancelling()).then_some(Message::CancelExport))
-                .style(button::danger),
-        ]
-        .align_y(Alignment::Center)
-        .spacing(10);
-        return Either::Left(once(Element::from(my_card(content))));
-    }
-
     match op_state {
+        LongOperationState::Progress(progress)
+            if *kind == LongOperationKind::Export && state.active_export.is_some() =>
+        {
+            let content = row![
+                text(progress.as_str()),
+                button("Cancel export")
+                    .on_press_maybe(
+                        (!state.is_export_cancelling()).then_some(Message::CancelExport)
+                    )
+                    .style(button::danger),
+            ]
+            .align_y(Alignment::Center)
+            .spacing(10);
+            Either::Left(once(Element::from(my_card(content))))
+        }
         LongOperationState::Progress(progress) => {
             Either::Left(once(Element::from(my_card(text(progress.as_str())))))
         }
