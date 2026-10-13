@@ -11,6 +11,8 @@
 mod config;
 mod games;
 mod homebrew;
+#[cfg(test)]
+mod import_tests;
 mod long_operation;
 mod message;
 mod notifications;
@@ -126,6 +128,3 @@ pub fn main() -> iced::Result {
         .theme(AppState::theme)
         .run()
 }
-
-#[cfg(test)]
-mod import_tests;

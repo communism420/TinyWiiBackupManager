@@ -4,14 +4,8 @@
 use crate::{
     config::message::ConfigMessage,
     games::{
-        ImportEntry,
-        calc_sha1::calc_sha1,
-        convert::convert_game,
-        export::export_game,
-        games_state::GamesState,
-        import::{BatchImportEvent, MAX_PARALLEL_IMPORTS},
-        scrub::scrub_game,
-        txtcodes::download_cheats,
+        ImportEntry, calc_sha1::calc_sha1, convert::convert_game, export::export_game,
+        games_state::GamesState, scrub::scrub_game, txtcodes::download_cheats,
     },
     homebrew::homebrew_state::HomebrewState,
     long_operation::{LongOperationKind, LongOperationState},
@@ -237,11 +231,14 @@ impl AppState {
             }
             Message::SetImportParallelJobs(jobs) => {
                 if !self.is_import_busy() {
-                    self.import_parallel_jobs = jobs.clamp(1, MAX_PARALLEL_IMPORTS);
+                    self.import_parallel_jobs =
+                        jobs.clamp(1, crate::games::import::MAX_PARALLEL_IMPORTS);
                 }
                 Task::none()
             }
             Message::ImportBatchUpdated(run_id, event) => {
+                use crate::games::import::BatchImportEvent;
+
                 let Some(run) = &mut self.active_import else {
                     return Task::none();
                 };
