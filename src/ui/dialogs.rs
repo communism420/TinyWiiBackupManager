@@ -34,6 +34,12 @@ const WIILOAD_EXTS: &[&str] = &[
     "ZIP", "DOL", "ELF",
 ];
 
+mod save_formats;
+use save_formats::SaveFormat;
+
+#[cfg(all(windows, feature = "dialogs-tfd"))]
+mod windows_save;
+
 #[cfg(feature = "dialogs-rfd")]
 type Base = rfd::AsyncFileDialog;
 
@@ -122,25 +128,41 @@ async fn save_file(
     base: Base,
     title: &'static str,
     filename: String,
-    filter: (&'static [&str], &'static str),
+    _filter: (&'static [&str], &'static str),
 ) -> Option<PathBuf> {
-    base.set_title(title)
-        .set_file_name(filename)
-        .add_filter(filter.1, filter.0)
-        .save_file()
-        .await
-        .map(PathBuf::from)
+    let mut dialog = base.set_title(title).set_file_name(filename);
+    for format in SaveFormat::ALL {
+        dialog = dialog.add_filter(
+            format!("{format} (*.{})", format.extension()),
+            &[format.extension()],
+        );
+    }
+    dialog.save_file().await.map(PathBuf::from)
 }
 
-#[cfg(feature = "dialogs-tfd")]
+#[cfg(all(windows, feature = "dialogs-tfd"))]
 async fn save_file(
     _base: Base,
     title: &'static str,
     filename: String,
-    filter: (&'static [&str], &'static str),
+    _filter: (&'static [&str], &'static str),
+) -> Option<PathBuf> {
+    // tinyfiledialogs only supports a single combined filter. The native Windows
+    // dialog exposes the individual export formats and updates their extensions.
+    smol::unblock(move || windows_save::save_game_file(title, &filename)).await
+}
+
+#[cfg(all(not(windows), feature = "dialogs-tfd"))]
+async fn save_file(
+    _base: Base,
+    title: &'static str,
+    filename: String,
+    _filter: (&'static [&str], &'static str),
 ) -> Option<PathBuf> {
     smol::unblock(move || {
-        tinyfiledialogs::save_file_dialog_with_filter(title, &filename, filter.0, filter.1)
+        let patterns = SaveFormat::ALL.map(|format| format!("*.{}", format.extension()));
+        let patterns = patterns.each_ref().map(String::as_str);
+        tinyfiledialogs::save_file_dialog_with_filter(title, &filename, &patterns, "Wii/NGC rom")
     })
     .await
     .map(PathBuf::from)
