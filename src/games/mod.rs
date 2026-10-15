@@ -24,7 +24,6 @@ pub mod games_state;
 pub mod import;
 pub mod scrub;
 pub mod txtcodes;
-
 pub(crate) mod zip_image;
 
 #[derive(Debug, Clone)]
