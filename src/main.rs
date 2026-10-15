@@ -79,7 +79,7 @@ pub fn main() -> iced::Result {
 
     let settings = iced::Settings {
         default_text_size: 14.into(),
-        id: Some("it.mq1.TinyWiiBackupManager".into()),
+        id: Some("io.github.communism420.TinyWiiBackupManagerPlus".into()),
         ..Default::default()
     };
 
@@ -115,7 +115,7 @@ pub fn main() -> iced::Result {
         // linux wayland only
         #[cfg(target_os = "linux")]
         platform_specific: iced::window::settings::PlatformSpecific {
-            application_id: "it.mq1.TinyWiiBackupManager".into(),
+            application_id: "io.github.communism420.TinyWiiBackupManagerPlus".into(),
             ..Default::default()
         },
 

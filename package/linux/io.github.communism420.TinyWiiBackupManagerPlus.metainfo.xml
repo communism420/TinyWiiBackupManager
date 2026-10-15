@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Copyright 2026 Manuel Quarneti -->
+<component type="desktop-application">
+    <id>io.github.communism420.TinyWiiBackupManagerPlus</id>
+    <metadata_license>CC0-1.0</metadata_license>
+    <project_license>GPL-3.0-only</project_license>
+    <name>TinyWiiBackupManagerPlus</name>
+    <summary>A tiny game backup and homebrew app manager for the Wii</summary>
+    <developer id="io.github.communism420">
+        <name>TinyWiiBackupManagerPlus contributors</name>
+    </developer>
+    <description>
+        <p>A fork of TinyWiiBackupManager by Manuel Quarneti.</p>
+        <p>‼️ TinyWiiBackupManagerPlus is intended strictly for legal homebrew use and is not affiliated with or endorsed by Nintendo. Use of TinyWiiBackupManagerPlus for pirated or unauthorized copies of games is strictly prohibited.</p>
+        <p>✨ Features</p>
+        <ul>
+            <li>Native app written in Rust and Iced, no Electron!</li>
+            <li>Cross-Platform: Windows XP+, macOS 10.12+, Linux ~2020+</li>
+        </ul>
+        <p>🎮 Game Management</p>
+        <ul>
+            <li>Games view: Manage your Wii and GameCube games</li>
+            <li>Format Support: .iso, .rvz and major formats thanks to NOD</li>
+            <li>Automatic Splitting: .wbfs file splitting when needed</li>
+            <li>Partition Stripping: Remove the update partition to save space</li>
+            <li>Game Archiving: Archive games using RVZ+zstd-19</li>
+            <li>Integrity Checks: Verify game data for corruption</li>
+            <li>GameTDB: Fetch covers and wiitdb.xml from GameTDB</li>
+            <li>TxtCodes: Download cheat codes from geckocodes.org (web archive), codes.rc24.xyz and gamehacking.org</li>
+        </ul>
+        <p>🛠️ Wii Homebrew Management</p>
+        <ul>
+            <li>Apps: Manage Wii homebrew applications</li>
+            <li>OSC: Download apps from the Open Shop Channel</li>
+            <li>Wiiload: Send apps directly to Wii via network</li>
+        </ul>
+    </description>
+    <launchable type="desktop-id">io.github.communism420.TinyWiiBackupManagerPlus.desktop</launchable>
+    <keywords>
+        <keyword>Game Manager</keyword>
+        <keyword>Game Backup Manager</keyword>
+        <keyword>Homebrew app Manager</keyword>
+        <keyword>Homebrew</keyword>
+        <keyword>Wii</keyword>
+        <keyword>GameCube</keyword>
+    </keywords>
+    <branding>
+        <color type="primary" scheme_preference="light">#d3d3d3</color>
+        <color type="primary" scheme_preference="dark">#a9a9a9</color>
+    </branding>
+    <content_rating type="oars-1.1"/>
+    <url type="bugtracker">https://github.com/communism420/TinyWiiBackupManagerPlus/issues</url>
+    <url type="homepage">https://github.com/communism420/TinyWiiBackupManagerPlus</url>
+    <url type="vcs-browser">https://github.com/communism420/TinyWiiBackupManagerPlus</url>
+    <screenshots>
+        <screenshot type="default">
+            <image>https://github.com/mq1/TinyWiiBackupManager/blob/v6.1.7/assets/screenshot.png?raw=true</image>
+            <caption>Original TinyWiiBackupManager interface</caption>
+        </screenshot>
+    </screenshots>
+    <releases>
+        <release version="1.0.0" date="2026-10-15">
+            <url type="details">https://github.com/communism420/TinyWiiBackupManagerPlus/releases/tag/v1.0.0</url>
+            <description>
+                <p>First TinyWiiBackupManagerPlus release, based on TinyWiiBackupManager 6.1.7.</p>
+                <ul>
+                    <li>Selected and parallel game imports and exports with cancellation.</li>
+                    <li>SHA1 checks for selected games and optional faster transfers.</li>
+                    <li>Independent application identity with existing settings copied on first launch.</li>
+                </ul>
+            </description>
+        </release>
+    </releases>
+</component>

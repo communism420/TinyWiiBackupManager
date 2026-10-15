@@ -13,16 +13,83 @@ on:
       - "Cargo.toml"
       - "Cargo.lock"
       - "package/**"
+      - "scripts/**"
+      - ".cargo/**"
+      - "vendor/**"
   pull_request:
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Create a draft release after checks (must equal v<Cargo version>)"
+        required: false
+        type: string
+        default: ""
 
 permissions:
-  contents: write
+  contents: read
 
 env:
-  VERSION_NAME: ${{ github.ref_type == 'tag' && github.ref_name || github.sha }}
+  VERSION_NAME: ${{ inputs.release_tag || (github.ref_type == 'tag' && github.ref_name || github.sha) }}
 
 jobs:
+  validate:
+    name: Validate source (${{ matrix.os }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: linux
+            runner: ubuntu-24.04
+            features: dist-appimage
+          - os: windows
+            runner: windows-2022
+            features: dist-windows-modern dist-windows-legacy
+          - os: macos
+            runner: macos-26
+            features: dist-macos
+    env:
+      TWBM_DISABLE_UPDATES: 1
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.99
+        with:
+          components: clippy, rustfmt
+
+      - name: Install NASM for Windows legacy tests
+        if: matrix.os == 'windows'
+        shell: pwsh
+        run: |
+          choco install nasm -y
+          "C:\Program Files\NASM" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Check version, formatting, tests and Clippy
+        shell: bash
+        env:
+          RELEASE_REF_TYPE: ${{ github.ref_type }}
+          RELEASE_REF_NAME: ${{ github.ref_name }}
+          REQUESTED_RELEASE_TAG: ${{ inputs.release_tag }}
+          CHECK_FEATURES: ${{ matrix.features }}
+        run: |
+          set -euo pipefail
+          version="$(./scripts/current-version.sh)"
+          if [ "$RELEASE_REF_TYPE" = tag ] && [ "$RELEASE_REF_NAME" != "v$version" ]; then
+            echo "Release tag $RELEASE_REF_NAME does not match Cargo version $version" >&2
+            exit 1
+          fi
+          if [ -n "$REQUESTED_RELEASE_TAG" ] && [ "$REQUESTED_RELEASE_TAG" != "v$version" ]; then
+            echo "Requested release tag $REQUESTED_RELEASE_TAG does not match Cargo version $version" >&2
+            exit 1
+          fi
+          cargo fmt --package TinyWiiBackupManagerPlus -- --check
+          for features in $CHECK_FEATURES; do
+            cargo test --locked --no-default-features --features "$features" --all-targets -- --test-threads=1
+            cargo clippy --locked --no-default-features --features "$features" --all-targets -- -D warnings
+          done
+
   # ==================================================================================
   #  Build & Bundle Jobs
   # ==================================================================================
@@ -54,7 +121,7 @@ jobs:
       - name: Install dependencies
         run: |
           apt-get update
-          apt-get install -y curl lsb-release software-properties-common gnupg
+          apt-get install -y curl lsb-release software-properties-common gnupg python3 desktop-file-utils
 
       - name: Install i686 dependencies
         if: matrix.arch == 'i686'
@@ -78,8 +145,8 @@ jobs:
 
       - name: Build binary
         run: |
-          cargo build -Z build-std=std,panic_abort --release --target ${{ matrix.target }} --no-default-features --features dist-appimage
-          cp target/${{ matrix.target }}/release/TinyWiiBackupManager .
+          cargo build --locked -Z build-std=std,panic_abort --release --target ${{ matrix.target }} --no-default-features --features dist-appimage
+          cp target/${{ matrix.target }}/release/TinyWiiBackupManagerPlus .
         env:
           RUSTC_BOOTSTRAP: 1
           CC: clang-23
@@ -93,18 +160,23 @@ jobs:
           CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: clang-23
           CARGO_TARGET_I686_UNKNOWN_LINUX_GNU_LINKER: clang-23
 
+      - name: Verify Linux executable
+        run: python3 scripts/verify-release.py binary TinyWiiBackupManagerPlus linux ${{ matrix.arch }}
+
       - name: Package AppImage
         run: |
-          cp -rP package/linux/AppDir TinyWiiBackupManager.AppDir
-          install -Dm0755 TinyWiiBackupManager TinyWiiBackupManager.AppDir/usr/bin/TinyWiiBackupManager
+          cp -rP package/linux/AppDir TinyWiiBackupManagerPlus.AppDir
+          install -Dm0755 TinyWiiBackupManagerPlus TinyWiiBackupManagerPlus.AppDir/usr/bin/TinyWiiBackupManagerPlus
+          desktop-file-validate TinyWiiBackupManagerPlus.AppDir/*.desktop
           mkdir -p dist
           cd dist
           export VERSION="$(../scripts/current-version.sh)"
           ../appimagetool-${{ matrix.arch }}.AppImage \
             --comp zstd --mksquashfs-opt -Xcompression-level --mksquashfs-opt 19 \
             -u "gh-releases-zsync|communism420|TinyWiiBackupManagerPlus|latest|*${{ matrix.arch }}.AppImage.zsync" \
-            ../TinyWiiBackupManager.AppDir \
-            "TinyWiiBackupManager-${{ env.VERSION_NAME }}-linux-${{ matrix.arch }}.AppImage"
+            ../TinyWiiBackupManagerPlus.AppDir \
+            "TinyWiiBackupManagerPlus-${VERSION_NAME}-linux-${{ matrix.arch }}.AppImage"
+          python3 ../scripts/verify-release.py binary "TinyWiiBackupManagerPlus-${VERSION_NAME}-linux-${{ matrix.arch }}.AppImage" linux ${{ matrix.arch }}
         env:
           ARCH: ${{ matrix.arch }}
           APPIMAGE_EXTRACT_AND_RUN: 1
@@ -114,6 +186,7 @@ jobs:
         with:
           name: dist-linux-${{ matrix.arch }}
           path: dist/*
+          if-no-files-found: error
 
   build-windows:
     name: Build for Windows
@@ -144,7 +217,7 @@ jobs:
       - name: Install LLVM
         run: |
           Invoke-WebRequest -Uri "https://github.com/llvm/llvm-project/releases/download/llvmorg-23.1.3/LLVM-23.1.3-win64.msi" -OutFile llvm.msi
-          Start-Process msiexec.exe -Wait -ArgumentList '/i llvm.msi /qn /norestart'
+          Start-Process msiexec.exe -WindowStyle Hidden -Wait -ArgumentList '/i llvm.msi /qn /norestart'
           "C:\Program Files\LLVM\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
       - name: Install Rust toolchain
@@ -163,7 +236,7 @@ jobs:
           Invoke-WebRequest -Uri "https://github.com/Chuyu-Team/VC-LTL5/releases/download/v5.3.1/VC-LTL-Binary.7z" -OutFile "VC-LTL-Binary.7z"
           7z x VC-LTL-Binary.7z -oVC-LTL-Binary
 
-      - name: Dowload and extract YY-Thunks
+      - name: Download and extract YY-Thunks
         if: matrix.arch == 'x64' || matrix.arch == 'x86'
         run: |
           Invoke-WebRequest -Uri "https://github.com/Chuyu-Team/YY-Thunks/releases/download/v1.2.3/YY-Thunks-Objs.zip" -OutFile "YY-Thunks-Objs.zip"
@@ -171,8 +244,8 @@ jobs:
 
       - name: Build binary
         run: |
-          cargo build -Z build-std=std,panic_abort --release --target ${{ matrix.target }} --no-default-features --features ${{ matrix.features }}
-          Copy-Item -Path "target\${{ matrix.target }}\release\TinyWiiBackupManager.exe" -Destination .
+          cargo build --locked -Z build-std=std,panic_abort --release --target ${{ matrix.target }} --no-default-features --features ${{ matrix.features }}
+          Copy-Item -Path "target\${{ matrix.target }}\release\TinyWiiBackupManagerPlus.exe" -Destination .
         env:
           RUSTC_BOOTSTRAP: 1
           CC: clang-cl
@@ -186,16 +259,20 @@ jobs:
           CARGO_TARGET_X86_64_WIN7_WINDOWS_MSVC_LINKER: lld-link
           CARGO_TARGET_AARCH64_PC_WINDOWS_MSVC_LINKER: lld-link
 
+      - name: Verify Windows executable
+        run: python scripts/verify-release.py binary TinyWiiBackupManagerPlus.exe windows ${{ matrix.arch }}
+
       - name: Rename binary
         run: |
           New-Item -Path "dist" -ItemType Directory -Force
-          Copy-Item "TinyWiiBackupManager.exe" "dist\TinyWiiBackupManager-${{ env.VERSION_NAME }}-windows-${{ matrix.arch }}.exe"
+          Copy-Item "TinyWiiBackupManagerPlus.exe" "dist\TinyWiiBackupManagerPlus-$($env:VERSION_NAME)-windows-${{ matrix.arch }}.exe"
 
       - name: Upload Windows distributables
         uses: actions/upload-artifact@v7
         with:
           name: dist-windows-${{ matrix.arch }}
           path: dist/*
+          if-no-files-found: error
 
   build-macos:
     name: Build for macOS
@@ -227,8 +304,8 @@ jobs:
 
       - name: Build binary
         run: |
-          cargo build -Z build-std=std,panic_abort --release --target ${{ matrix.target }} --no-default-features --features dist-macos
-          cp target/${{ matrix.target }}/release/TinyWiiBackupManager .
+          cargo build --locked -Z build-std=std,panic_abort --release --target ${{ matrix.target }} --no-default-features --features dist-macos
+          cp target/${{ matrix.target }}/release/TinyWiiBackupManagerPlus .
         env:
           RUSTC_BOOTSTRAP: 1
           CC: /opt/homebrew/opt/llvm@23/bin/clang
@@ -241,11 +318,15 @@ jobs:
           CARGO_TARGET_AARCH64_APPLE_DARWIN_LINKER: ./macos-linker.sh
           CARGO_TARGET_X86_64_APPLE_DARWIN_LINKER: ./macos-linker.sh
 
+      - name: Verify macOS architecture
+        run: lipo TinyWiiBackupManagerPlus -verify_arch ${{ matrix.arch }}
+
       - name: Upload macOS binaries
         uses: actions/upload-artifact@v7
         with:
           name: build-macos-${{ matrix.arch }}
-          path: TinyWiiBackupManager
+          path: TinyWiiBackupManagerPlus
+          if-no-files-found: error
 
   build-macos-universal:
     name: Build for macOS (Universal)
@@ -265,21 +346,26 @@ jobs:
 
       - name: Create the .app bundle
         run: |
-          cp -r package/macos/App TinyWiiBackupManager.app
-          mkdir -p TinyWiiBackupManager.app/Contents/MacOS
+          cp -r package/macos/App TinyWiiBackupManagerPlus.app
+          mkdir -p TinyWiiBackupManagerPlus.app/Contents/MacOS
           VERSION="$(./scripts/current-version.sh)"
-          /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string $VERSION" TinyWiiBackupManager.app/Contents/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" TinyWiiBackupManagerPlus.app/Contents/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $VERSION" TinyWiiBackupManagerPlus.app/Contents/Info.plist
 
       - name: Build the fat binary
         run: |
           lipo -create \
-            -output TinyWiiBackupManager.app/Contents/MacOS/TinyWiiBackupManager \
-            build-macos-arm64/TinyWiiBackupManager \
-            build-macos-x86_64/TinyWiiBackupManager
-          chmod 755 TinyWiiBackupManager.app/Contents/MacOS/TinyWiiBackupManager
+            -output TinyWiiBackupManagerPlus.app/Contents/MacOS/TinyWiiBackupManagerPlus \
+            build-macos-arm64/TinyWiiBackupManagerPlus \
+            build-macos-x86_64/TinyWiiBackupManagerPlus
+          chmod 755 TinyWiiBackupManagerPlus.app/Contents/MacOS/TinyWiiBackupManagerPlus
+          lipo TinyWiiBackupManagerPlus.app/Contents/MacOS/TinyWiiBackupManagerPlus -verify_arch arm64 x86_64
+          plutil -lint TinyWiiBackupManagerPlus.app/Contents/Info.plist
 
       - name: Sign the .app bundle
-        run: codesign --force --deep -s - TinyWiiBackupManager.app
+        run: |
+          codesign --force --deep -s - TinyWiiBackupManagerPlus.app
+          codesign --verify --deep --strict TinyWiiBackupManagerPlus.app
 
       - name: Install appdmg
         run: npm i -g appdmg
@@ -287,22 +373,26 @@ jobs:
       - name: Create Universal DMG
         run: |
           mkdir dist
-          appdmg package/macos/appdmg.json "dist/TinyWiiBackupManager-${{ env.VERSION_NAME }}-macos-universal.dmg"
+          appdmg package/macos/appdmg.json "dist/TinyWiiBackupManagerPlus-${VERSION_NAME}-macos-universal.dmg"
+          hdiutil verify "dist/TinyWiiBackupManagerPlus-${VERSION_NAME}-macos-universal.dmg"
 
       - name: Upload macOS distributables
         uses: actions/upload-artifact@v7
         with:
           name: dist-macos-universal
           path: dist/*
+          if-no-files-found: error
 
   # ==================================================================================
-  #  Release Job: Collects all artifacts and creates a single GitHub Release.
+  #  Release Job: Collects checked artifacts into a draft for final verification.
   # ==================================================================================
   release:
-    name: Create GitHub Release
-    if: github.ref_type == 'tag'
-    runs-on: ubuntu-slim
-    needs: [build-linux, build-windows, build-macos, build-macos-universal]
+    name: Create draft GitHub Release
+    if: github.ref_type == 'tag' || (github.event_name == 'workflow_dispatch' && inputs.release_tag != '')
+    runs-on: ubuntu-24.04
+    needs: [validate, build-linux, build-windows, build-macos, build-macos-universal]
+    permissions:
+      contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -316,14 +406,25 @@ jobs:
           pattern: "dist-*" # This pattern will match all final distributable artifacts
           merge-multiple: true # This places all matching artifacts into a single 'dist' directory
 
-      - name: Create version.txt
-        run: ./scripts/current-version.sh > dist/version.txt
+      - name: Check asset set and create checksums
+        env:
+          RELEASE_TAG: ${{ env.VERSION_NAME }}
+        run: |
+          ./scripts/current-version.sh > dist/version.txt
+          python3 scripts/verify-release.py assets dist \
+            --version "$(./scripts/current-version.sh)" --tag "$RELEASE_TAG" --write-checksums
+          cd dist
+          sha256sum --check SHA256SUMS
 
-      - name: Create GitHub Release
+      - name: Create draft GitHub Release
         uses: softprops/action-gh-release@v3
         with:
           files: dist/*
           body_path: package/release-body.md
+          draft: true
+          tag_name: ${{ env.VERSION_NAME }}
+          target_commitish: ${{ github.sha }}
+          fail_on_unmatched_files: true
           prerelease: ${{ contains(env.VERSION_NAME, 'alpha') || contains(env.VERSION_NAME, 'beta') || contains(env.VERSION_NAME, 'rc') }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

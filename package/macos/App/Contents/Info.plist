@@ -5,21 +5,23 @@
     <key>CFBundleDevelopmentRegion</key>
     <string>English</string>
     <key>CFBundleDisplayName</key>
-    <string>TinyWiiBackupManager</string>
+    <string>TinyWiiBackupManagerPlus</string>
     <key>CFBundleExecutable</key>
-    <string>TinyWiiBackupManager</string>
+    <string>TinyWiiBackupManagerPlus</string>
     <key>CFBundleIconFile</key>
     <string>TinyWiiBackupManager.icns</string>
     <key>CFBundleIdentifier</key>
-    <string>it.mq1.TinyWiiBackupManager</string>
+    <string>io.github.communism420.TinyWiiBackupManagerPlus</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>
-    <string>TinyWiiBackupManager</string>
+    <string>TinyWiiBackupManagerPlus</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0.0</string>
     <key>CFBundleVersion</key>
-    <string>1</string>
+    <string>1.0.0</string>
     <key>CSResourcesFileMapped</key>
     <true/>
     <key>LSApplicationCategoryType</key>

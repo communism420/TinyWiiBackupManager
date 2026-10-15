@@ -10,11 +10,11 @@ magick assets/TinyWiiBackupManager-1024x1024.png ${MAGICK_ARGS} -resize 256x256 
 oxipng -sao6 assets/TinyWiiBackupManager-256x256.png
 
 # Linux
-rm -rf package/linux/usr/share/icons
+rm -rf package/linux/AppDir/usr/share/icons
 for res in "${TARGET_RESOLUTIONS[@]}"; do
-  mkdir -p package/linux/usr/share/icons/hicolor/${res}/apps
-  magick assets/TinyWiiBackupManager-1024x1024.png ${MAGICK_ARGS} -resize ${res} package/linux/usr/share/icons/hicolor/${res}/apps/it.mq1.TinyWiiBackupManager.png
-  oxipng -sao6 package/linux/usr/share/icons/hicolor/${res}/apps/it.mq1.TinyWiiBackupManager.png
+  mkdir -p package/linux/AppDir/usr/share/icons/hicolor/${res}/apps
+  magick assets/TinyWiiBackupManager-1024x1024.png ${MAGICK_ARGS} -resize ${res} package/linux/AppDir/usr/share/icons/hicolor/${res}/apps/io.github.communism420.TinyWiiBackupManagerPlus.png
+  oxipng -sao6 package/linux/AppDir/usr/share/icons/hicolor/${res}/apps/io.github.communism420.TinyWiiBackupManagerPlus.png
 done
 
 # Windows

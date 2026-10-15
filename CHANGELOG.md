@@ -7,8 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-10-15
+
+First TinyWiiBackupManagerPlus release, based on TinyWiiBackupManager 6.1.7 and the subsequent Wiiload 0.7.1 dependency update. The original project's history is retained below.
+
 ### Added
 
+- TinyWiiBackupManagerPlus application name, version 1.0.0, separate application identifiers and data directories, and configuration import from previous builds without overwriting either existing configuration.
 - Optional Fast transfer setting shared by imports and exports, saved between launches and frozen while a transfer or destination picker is active. It preserves the chosen format and simultaneous-game count.
 - Cancellation for single, sequential and parallel game imports, available in the import queue and progress notification, with cleanup before restarting and cancelled entries retained for retry.
 - Batch game import with individual selection, Select all, and 1–4 simultaneous games (2 by default), progress across active jobs, and failed entries retained for retry.
@@ -25,6 +30,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - WIA/RVZ exports now preserve original Wii sector hashes and padding, including nonstandard dumps, instead of silently replacing them with reconstructed values.
 - Reduced the size of UI messages and modal state by boxing the Homebrew app details payload.
 - Removed redundant cloning of the empty legacy dialog context while preserving context reuse with modern file dialogs.
+- ZIP imports locate the game image after a directory or README and reject ambiguous archives; full import coverage includes these layouts.
+- Split-image reading, additional GameCube disc identification, and manual conversion source protection.
+- Path normalization preserves auxiliary files, checks destination collisions and attempts rollback after failed moves.
+- HTTP deadlines and incomplete-download cleanup, homebrew Unicode metadata and release dates, and validation of downloaded catalogs before replacing cached data.
+- Scrollable homebrew details and accurate packaged AppImage versions.
+
+### Changed
+
+- Updates and source links point to this fork. Earlier 6.x executables require a manual download to move to the new 1.x version sequence.
+- Bundled `nod` integrity and worker-shutdown fixes keep the first release self-contained; provenance and licenses remain in `vendor/nod`.
+- Release packages cover Windows x86/x64/ARM64, Linux i686/x86_64/aarch64, and a macOS Universal application for Intel and Apple Silicon.
+- Release automation runs tests and strict Clippy, validates distributables, and prepares a draft with SHA256 checksums before publication.
 
 ## [v6.1.7] - 2026-10-13
 
@@ -575,7 +592,8 @@ Open an issue if you need any of these (explaining why you think feature X is im
 
 - 🖼️ TinyWiiBackupManager icon now shows up again on the windows exe
 
-[Unreleased]: https://github.com/mq1/TinyWiiBackupManager/compare/v6.1.7...HEAD
+[Unreleased]: https://github.com/communism420/TinyWiiBackupManagerPlus/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/communism420/TinyWiiBackupManagerPlus/releases/tag/v1.0.0
 [v6.1.7]: https://github.com/mq1/TinyWiiBackupManager/compare/v6.1.6...v6.1.7
 [v6.1.6]: https://github.com/mq1/TinyWiiBackupManager/compare/v6.1.5...v6.1.6
 [v6.1.5]: https://github.com/mq1/TinyWiiBackupManager/compare/v6.1.4...v6.1.5

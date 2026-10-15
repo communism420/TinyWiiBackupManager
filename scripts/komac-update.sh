@@ -2,11 +2,7 @@
 # SPDX-FileCopyrightText: 2026 Manuel Quarneti <mq1@ik.me>
 # SPDX-License-Identifier: GPL-3.0-only
 
-komac update mq1.TinyWiiBackupManager \
-    --version $1 \
-    --urls \
-        https://github.com/mq1/TinyWiiBackupManager/releases/download/v$1/TinyWiiBackupManager-v$1-windows-x64.exe \
-        https://github.com/mq1/TinyWiiBackupManager/releases/download/v$1/TinyWiiBackupManager-v$1-windows-x86.exe \
-        https://github.com/mq1/TinyWiiBackupManager/releases/download/v$1/TinyWiiBackupManager-v$1-windows-arm64.exe \
-    --submit
+echo "TinyWiiBackupManagerPlus is not registered in WinGet yet." >&2
+echo "Register a separate package before submitting fork releases; do not update mq1.TinyWiiBackupManager with Plus binaries." >&2
+exit 1
 

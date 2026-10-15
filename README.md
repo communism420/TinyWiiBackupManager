@@ -1,4 +1,4 @@
-<img alt="TinyWiiBackupManager Logo" width="128" src="assets/TinyWiiBackupManager-256x256.png" align="left">
+<img alt="TinyWiiBackupManagerPlus Logo" width="128" src="assets/TinyWiiBackupManager-256x256.png" align="left">
 
 ### `TinyWiiBackupManagerPlus`<br><sub><sup>:star: A tiny game backup and homebrew app manager for the Wii</sup></sub>
 
@@ -9,8 +9,8 @@ TinyWiiBackupManagerPlus is a fork of [TinyWiiBackupManager](https://github.com/
 <br>
 
 > [!CAUTION]
-> TinyWiiBackupManager is intended strictly for legal homebrew use and is not affiliated with or endorsed by Nintendo.
-> Use of TinyWiiBackupManager for pirated or unauthorized copies of games is strictly prohibited.
+> TinyWiiBackupManagerPlus is intended strictly for legal homebrew use and is not affiliated with or endorsed by Nintendo.
+> Use of TinyWiiBackupManagerPlus for pirated or unauthorized copies of games is strictly prohibited.
 
 <img align="center" alt="App Screenshot" src="assets/screenshot.png">
 
@@ -49,9 +49,23 @@ TinyWiiBackupManagerPlus is a fork of [TinyWiiBackupManager](https://github.com/
 
 ## :arrow_down: Downloads
 
-No TinyWiiBackupManagerPlus release has been published yet. Future builds will be available on the [fork's releases page](https://github.com/communism420/TinyWiiBackupManagerPlus/releases).
+Download **TinyWiiBackupManagerPlus 1.0.0** from the [releases page](https://github.com/communism420/TinyWiiBackupManagerPlus/releases/latest).
 
-For the original project, see [TinyWiiBackupManager releases](https://github.com/mq1/TinyWiiBackupManager/releases/latest), [Flathub](https://flathub.org/apps/it.mq1.TinyWiiBackupManager), or `winget install -e --id mq1.TinyWiiBackupManager`. These install the original application and do not include this fork's changes.
+| System | Download |
+| --- | --- |
+| Windows, most Intel/AMD PCs | `TinyWiiBackupManagerPlus-v1.0.0-windows-x64.exe` |
+| Windows, 32-bit / legacy systems | `TinyWiiBackupManagerPlus-v1.0.0-windows-x86.exe` |
+| Windows on ARM | `TinyWiiBackupManagerPlus-v1.0.0-windows-arm64.exe` |
+| Linux, most Intel/AMD PCs | `TinyWiiBackupManagerPlus-v1.0.0-linux-x86_64.AppImage` |
+| Linux, 32-bit Intel/AMD | `TinyWiiBackupManagerPlus-v1.0.0-linux-i686.AppImage` |
+| Linux, ARM64 | `TinyWiiBackupManagerPlus-v1.0.0-linux-aarch64.AppImage` |
+| macOS, Intel and Apple Silicon | `TinyWiiBackupManagerPlus-v1.0.0-macos-universal.dmg` |
+
+Windows executables run without an installer. On Linux, make the AppImage executable before launching it (`chmod +x TinyWiiBackupManagerPlus-*.AppImage`). On macOS, drag TinyWiiBackupManagerPlus into Applications; the app is ad-hoc signed and is not notarized. See the release notes for installation details and verification limits. `SHA256SUMS` accompanies the downloadable files.
+
+**Moving from an earlier 6.x build:** download 1.0.0 manually. This fork starts its own version sequence, so an older 6.x executable will not offer 1.0.0 as a newer version. Plus uses a separate data directory and copies the previous `config.json` only when its own configuration does not exist. The original configuration is preserved; caches are rebuilt as needed. Portable mode uses `TinyWiiBackupManagerPlus-data` beside the executable and can import settings from a sibling `TinyWiiBackupManager-data` directory.
+
+The original project's [Flathub package](https://flathub.org/apps/it.mq1.TinyWiiBackupManager) and `winget install -e --id mq1.TinyWiiBackupManager` install the original application and do not include this fork's changes.
 
 <br>
 

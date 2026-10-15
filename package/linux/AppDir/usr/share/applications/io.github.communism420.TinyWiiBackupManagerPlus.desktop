@@ -1,0 +1,9 @@
+[Desktop Entry]
+Categories=Game;Utility;
+Comment=A tiny game backup and homebrew app manager for the Wii
+Exec=TinyWiiBackupManagerPlus
+Icon=io.github.communism420.TinyWiiBackupManagerPlus
+Name=TinyWiiBackupManagerPlus
+Terminal=false
+Type=Application
+StartupWMClass=io.github.communism420.TinyWiiBackupManagerPlus

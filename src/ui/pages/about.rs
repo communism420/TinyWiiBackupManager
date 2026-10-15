@@ -17,7 +17,7 @@ use lucide_icons::{
 };
 use std::sync::LazyLock;
 
-const TITLE: &str = concat!("TinyWiiBackupManager v", env!("CARGO_PKG_VERSION"));
+const TITLE: &str = concat!(env!("CARGO_PKG_NAME"), " v", env!("CARGO_PKG_VERSION"));
 
 static ICON: LazyLock<Allocation> = LazyLock::new(|| {
     let bytes = include_bytes!("../../../assets/TinyWiiBackupManager-256x256.png");
@@ -60,7 +60,7 @@ pub fn about(state: &AppState) -> Element<'_, Message> {
                 .spacing(20),
                 row![
                     icon_alert_triangle().size(20),
-                    "TinyWiiBackupManager is intended strictly for legal homebrew use and is not affiliated with or endorsed by Nintendo. Use of TinyWiiBackupManager for pirated or unauthorized copies of games is strictly prohibited."
+                    "TinyWiiBackupManagerPlus is intended strictly for legal homebrew use and is not affiliated with or endorsed by Nintendo. Use of TinyWiiBackupManagerPlus for pirated or unauthorized copies of games is strictly prohibited."
                 ]
                 .spacing(20)
                 .align_y(Alignment::Center),
