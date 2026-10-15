@@ -62,9 +62,7 @@ jobs:
       - name: Install NASM for Windows legacy tests
         if: matrix.os == 'windows'
         shell: pwsh
-        run: |
-          choco install nasm -y
-          "C:\Program Files\NASM" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+        run: ./scripts/install-nasm.ps1
 
       - name: Check version, formatting, tests and Clippy
         shell: bash
@@ -227,9 +225,7 @@ jobs:
 
       - name: Install NASM (for aws-lc-rs)
         if: matrix.features == 'dist-windows-legacy' && matrix.arch != 'x64'
-        run: |
-          choco install nasm -y
-          "C:\Program Files\NASM" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+        run: ./scripts/install-nasm.ps1
 
       - name: Download and extract VC-LTL5
         run: |
@@ -245,6 +241,7 @@ jobs:
       - name: Build binary
         run: |
           cargo build --locked -Z build-std=std,panic_abort --release --target ${{ matrix.target }} --no-default-features --features ${{ matrix.features }}
+          if ($LASTEXITCODE -ne 0) { throw "Cargo build failed with exit code $LASTEXITCODE." }
           Copy-Item -Path "target\${{ matrix.target }}\release\TinyWiiBackupManagerPlus.exe" -Destination .
         env:
           RUSTC_BOOTSTRAP: 1
