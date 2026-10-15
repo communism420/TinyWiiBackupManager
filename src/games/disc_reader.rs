@@ -49,6 +49,81 @@ pub struct SharedMultiFileReader {
     stream_len: u64,
 }
 
+use std::path::Path;
+
+pub trait DiscCancellation: Clone + Send + Sync {
+    fn check(&self) -> io::Result<()>;
+}
+
+#[derive(Debug)]
+pub(crate) struct DiscCancelled(pub &'static str);
+
+impl std::fmt::Display for DiscCancelled {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} cancelled", self.0)
+    }
+}
+impl std::error::Error for DiscCancelled {}
+
+pub(crate) fn error_contains<E: std::error::Error + 'static>(
+    error: &(dyn std::error::Error + 'static),
+) -> bool {
+    if error.is::<E>() {
+        return true;
+    }
+    if let Some(inner) = error
+        .downcast_ref::<io::Error>()
+        .and_then(io::Error::get_ref)
+    {
+        return error_contains::<E>(inner);
+    }
+    error.source().is_some_and(error_contains::<E>)
+}
+
+/// Keeps cancellation active when nod clones a stream for its worker threads.
+#[derive(Clone)]
+pub struct CancellableDiscStream<C> {
+    inner: SharedMultiFileReader,
+    cancel: C,
+}
+
+impl<C: DiscCancellation> CancellableDiscStream<C> {
+    pub fn new(inner: SharedMultiFileReader, cancel: C) -> Self {
+        Self { inner, cancel }
+    }
+}
+
+impl<C: DiscCancellation + 'static> DiscStream for CancellableDiscStream<C> {
+    fn stream_len(&mut self) -> io::Result<u64> {
+        self.cancel.check()?;
+        let len = self.inner.stream_len()?;
+        self.cancel.check()?;
+        Ok(len)
+    }
+
+    fn read_exact_at(&mut self, buf: &mut [u8], mut offset: u64) -> io::Result<()> {
+        self.cancel.check()?;
+        // A format may request a large metadata table or compressed block in
+        // one call. Bound each source read so cancellation is checked in between.
+        for chunk in buf.chunks_mut(1024 * 1024) {
+            self.cancel.check()?;
+            self.inner.read_exact_at(chunk, offset)?;
+            self.cancel.check()?;
+            offset = offset
+                .checked_add(chunk.len() as u64)
+                .ok_or_else(|| io::Error::other("disc read offset overflow"))?;
+        }
+        self.cancel.check()
+    }
+}
+
+pub fn retrieve_multi_disc_files_cancellable<C: DiscCancellation>(
+    path: &Path,
+    cancel: &C,
+) -> Result<ArrayVec<File, 4>> {
+    retrieve::retrieve_multi_disc_files_with_check(path, || cancel.check())
+}
+
 impl SharedMultiFileReader {
     pub fn new(files: impl IntoIterator<Item = File>) -> Result<Self> {
         let mut inner = ArrayVec::new();
@@ -63,6 +138,9 @@ impl SharedMultiFileReader {
         Ok(Self { inner, stream_len })
     }
 }
+
+#[cfg(test)]
+mod tests;
 
 impl DiscStream for SharedMultiFileReader {
     fn stream_len(&mut self) -> io::Result<u64> {
@@ -80,7 +158,8 @@ impl DiscStream for SharedMultiFileReader {
                 continue;
             }
 
-            let n = ((*len - offset) as usize).min(buf.len());
+            // Limit in u64 before narrowing: a single ISO may exceed usize on x86.
+            let n = (*len - offset).min(buf.len() as u64) as usize;
             file.read_exact_at(&mut buf[..n], offset)?;
             buf = &mut buf[n..];
             offset = 0;

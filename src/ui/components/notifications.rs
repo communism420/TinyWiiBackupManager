@@ -52,10 +52,26 @@ fn item((i, notification): (usize, &Notification)) -> Element<'_, Message> {
     .into()
 }
 
-fn progress(
-    (op_state, _): &(LongOperationState, LongOperationKind),
-) -> impl Iterator<Item = Element<'_, Message>> {
+fn progress<'a>(
+    (op_state, kind): &'a (LongOperationState, LongOperationKind),
+    state: &AppState,
+) -> impl Iterator<Item = Element<'a, Message>> {
     match op_state {
+        LongOperationState::Progress(progress)
+            if *kind == LongOperationKind::Export && state.active_export.is_some() =>
+        {
+            let content = row![
+                text(progress.as_str()),
+                button("Cancel export")
+                    .on_press_maybe(
+                        (!state.is_export_cancelling()).then_some(Message::CancelExport)
+                    )
+                    .style(button::danger),
+            ]
+            .align_y(Alignment::Center)
+            .spacing(10);
+            Either::Left(once(Element::from(my_card(content))))
+        }
         LongOperationState::Progress(progress) => {
             Either::Left(once(Element::from(my_card(text(progress.as_str())))))
         }
@@ -69,7 +85,12 @@ pub fn notifications(state: &AppState) -> Element<'_, Message> {
         .iter()
         .enumerate()
         .map(item)
-        .chain(state.long_operations.iter().flat_map(progress))
+        .chain(
+            state
+                .long_operations
+                .iter()
+                .flat_map(|operation| progress(operation, state)),
+        )
         .collect::<Column<'_, Message>>()
         .padding(10)
         .spacing(10)

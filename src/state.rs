@@ -50,6 +50,10 @@ pub struct AppState {
     pub notifications: NotificationList,
     pub drive: DriveState,
     pub games: GamesState,
+    pub export_picker: Option<u64>,
+    export_picker_sequence: u64,
+    pub active_export: Option<ExportRun>,
+    export_run_sequence: u64,
     pub homebrew: HomebrewState,
     pub current_page: Page,
     pub current_modal: Option<Modal>,
@@ -72,6 +76,10 @@ impl AppState {
                     notifications: NotificationList::new(data_dir),
                     drive: DriveState::NotLoaded,
                     games: GamesState::NotLoaded,
+                    export_picker: None,
+                    export_picker_sequence: 0,
+                    active_export: None,
+                    export_run_sequence: 0,
                     homebrew: HomebrewState::NotLoaded,
                     current_page: Page::Games,
                     current_modal: None,
@@ -405,5 +413,61 @@ impl AppState {
             self.get_homebrew_apps_task(),
             self.get_drive_info_task(),
         ])
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct ExportRun {
+    pub id: u64,
+    pub cancellation: crate::games::export::ExportCancellation,
+}
+
+impl AppState {
+    pub fn is_export_busy(&self) -> bool {
+        self.export_picker.is_some()
+            || self.active_export.is_some()
+            || !self.long_operations.is_idle(LongOperationKind::Export)
+    }
+
+    pub fn is_export_cancelling(&self) -> bool {
+        self.active_export
+            .as_ref()
+            .is_some_and(|run| run.cancellation.is_cancelled())
+    }
+
+    pub fn begin_export_run(&mut self) -> ExportRun {
+        self.export_run_sequence = self.export_run_sequence.wrapping_add(1);
+        let run = ExportRun {
+            id: self.export_run_sequence,
+            cancellation: crate::games::export::ExportCancellation::default(),
+        };
+        self.active_export = Some(run.clone());
+        run
+    }
+
+    pub fn dismiss_export_selection(&mut self) {
+        self.export_picker = None;
+        if matches!(self.current_modal, Some(Modal::ExportGames(_))) {
+            self.current_modal = None;
+        }
+    }
+
+    pub fn begin_export_picker(&mut self) -> Option<u64> {
+        if self.is_export_busy() {
+            return None;
+        }
+
+        self.export_picker_sequence = self.export_picker_sequence.wrapping_add(1);
+        self.export_picker = Some(self.export_picker_sequence);
+        self.export_picker
+    }
+
+    pub fn finish_export_picker(&mut self, request: u64) -> bool {
+        if self.export_picker != Some(request) {
+            return false;
+        }
+
+        self.export_picker = None;
+        true
     }
 }

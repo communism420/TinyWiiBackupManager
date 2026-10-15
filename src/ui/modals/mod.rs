@@ -7,6 +7,7 @@ use std::path::PathBuf;
 pub mod check_games;
 pub mod confirm_scub;
 pub mod delete_dir;
+pub mod export_games;
 pub mod game_info;
 pub mod homebrew_app_info;
 pub mod osc_app_info;
@@ -19,4 +20,5 @@ pub enum Modal {
     OscAppInfo(OscApp),
     DeleteDir(PathBuf),
     ConfirmScrub(Game),
+    ExportGames(export_games::ExportSelection),
 }
