@@ -13,6 +13,8 @@ mod games;
 #[cfg(test)]
 mod hash_tests;
 mod homebrew;
+#[cfg(test)]
+mod import_tests;
 mod long_operation;
 mod message;
 mod notifications;

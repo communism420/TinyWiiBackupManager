@@ -73,7 +73,25 @@ fn progress<'a>(
             Either::Left(once(Element::from(my_card(content))))
         }
         LongOperationState::Progress(progress) => {
-            Either::Left(once(Element::from(my_card(text(progress.as_str())))))
+            let mut content = row![text(progress.as_str())]
+                .align_y(Alignment::Center)
+                .spacing(10);
+            if *kind == LongOperationKind::Import
+                && let Some(run) = &state.active_import
+            {
+                content = content.push(
+                    button(if state.is_import_cancelling() {
+                        "Cancelling..."
+                    } else {
+                        "Cancel import"
+                    })
+                    .on_press_maybe(
+                        (!state.is_import_cancelling()).then_some(Message::CancelImportRun(run.id)),
+                    )
+                    .style(button::danger),
+                );
+            }
+            Either::Left(once(Element::from(my_card(content))))
         }
         _ => Either::Right(empty()),
     }
