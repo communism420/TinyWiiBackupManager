@@ -20,6 +20,17 @@ use iced::{
 };
 use lucide_icons::Icon;
 
+fn hash_games_button(games: &GameList, state: &AppState) -> Element<'static, Message> {
+    let mut hash = my_button()
+        .icon(Icon::SearchCheck)
+        .kind(MyButtonKind::Toolbar);
+    if state.hash_batch.is_some() || (games.count() > 0 && !state.is_hash_busy()) {
+        hash = hash.on_press(Message::OpenHashGames);
+    }
+
+    tooltip(hash, my_card("Check SHA1"), tooltip::Position::Bottom).into()
+}
+
 pub fn games_titlebar<'a>(games: &'a GameList, state: &'a AppState) -> Element<'a, Message> {
     row![
         game_search(games),
@@ -28,6 +39,7 @@ pub fn games_titlebar<'a>(games: &'a GameList, state: &'a AppState) -> Element<'
         sort_by(&state.config).map(Message::Config),
         view_as(&state.config).map(Message::Config),
         space().width(5),
+        hash_games_button(games, state),
         refresh_button(state),
         tooltip(
             my_button()

@@ -4,6 +4,7 @@
 use crate::{games::game::Game, homebrew::homebrew_app::HomebrewApp, osc::osc_app::OscApp};
 use std::path::PathBuf;
 
+pub mod check_games;
 pub mod confirm_scub;
 pub mod delete_dir;
 pub mod game_info;
@@ -12,6 +13,7 @@ pub mod osc_app_info;
 
 #[derive(Debug, Clone)]
 pub enum Modal {
+    CheckGames,
     GameInfo((Game, Option<wii_disc_info::Meta>, bool)),
     HomebrewAppInfo(HomebrewApp),
     OscAppInfo(OscApp),

@@ -45,6 +45,14 @@ pub fn view(state: &AppState) -> Element<'_, Message> {
         state.current_modal.as_ref().map(|modal| {
             opaque(
                 container(match modal {
+                    Modal::CheckGames => match &state.hash_batch {
+                        Some(selection) => crate::ui::modals::check_games::check_games(
+                            selection,
+                            state.is_hash_busy(),
+                            matches!(&state.games, crate::games::games_state::GamesState::Loaded(games) if games.count() > 0),
+                        ),
+                        None => iced::widget::space().into(),
+                    },
                     Modal::GameInfo((game, disc_info, scrubbable)) => {
                         game_info(game, disc_info.as_ref(), *scrubbable, state)
                     }
