@@ -315,36 +315,59 @@ fn duplicate_inputs_existing_files_and_missing_source_do_not_block_other_games()
 
 #[test]
 fn zip_same_format_is_rewound_and_copied_completely() {
-    let temp = tempfile::tempdir().unwrap();
-    let source = temp.path().join("source.zip");
-    let bytes = disc(0, 0);
-    let mut zip = zip::ZipWriter::new(File::create(&source).unwrap());
-    zip.start_file("game.iso", zip::write::SimpleFileOptions::default())
-        .unwrap();
-    zip.write_all(&bytes).unwrap();
-    zip.finish().unwrap();
-    let entry = smol::block_on(ImportEntry::new(source)).unwrap();
-    let config = config(temp.path());
-    let events = smol::block_on(
-        import_games(
-            vec![entry.clone()],
-            config.clone(),
-            DriveState::NotLoaded,
-            1,
-            ImportCancellation::default(),
-        )
-        .collect::<Vec<_>>(),
-    );
-    assert_eq!(
-        summary(&events),
-        &ImportSummary {
-            imported: 1,
-            failed: 0,
-            cancelled: 0
-        },
-        "{events:#?}"
-    );
-    assert_eq!(std::fs::read(destination(&entry, &config)).unwrap(), bytes);
+    for leading_entry in [None, Some("images/"), Some("README.txt")] {
+        let temp = tempfile::tempdir().unwrap();
+        let source = temp.path().join("source.zip");
+        let bytes = disc(0, 0);
+        let mut zip = zip::ZipWriter::new(File::create(&source).unwrap());
+        let options = zip::write::SimpleFileOptions::default();
+        if let Some(name) = leading_entry {
+            if name.ends_with('/') {
+                zip.add_directory(name, options).unwrap();
+            } else {
+                zip.start_file(name, options).unwrap();
+                zip.write_all(b"This archive contains one game.").unwrap();
+            }
+        }
+        let image_name = if leading_entry.is_some() {
+            "images/game.iso"
+        } else {
+            "game.iso"
+        };
+        zip.start_file(image_name, options).unwrap();
+        zip.write_all(&bytes).unwrap();
+        zip.finish().unwrap();
+        let archive_bytes = std::fs::read(&source).unwrap();
+        let entry = smol::block_on(ImportEntry::new(source.clone())).unwrap();
+        let config = config(temp.path());
+        let events = smol::block_on(
+            import_games(
+                vec![entry.clone()],
+                config.clone(),
+                DriveState::NotLoaded,
+                1,
+                ImportCancellation::default(),
+            )
+            .collect::<Vec<_>>(),
+        );
+        assert_eq!(
+            summary(&events),
+            &ImportSummary {
+                imported: 1,
+                failed: 0,
+                cancelled: 0
+            },
+            "leading entry {leading_entry:?}: {events:#?}"
+        );
+        assert!(
+            std::fs::read(destination(&entry, &config)).unwrap() == bytes,
+            "Imported image changed with leading entry {leading_entry:?}"
+        );
+        assert!(
+            std::fs::read(&source).unwrap() == archive_bytes,
+            "Source ZIP changed with leading entry {leading_entry:?}"
+        );
+    }
 }
 
 #[test]
@@ -668,7 +691,10 @@ fn fast_and_direct_import_match_for_all_supported_console_formats() {
                 .take(original.len() as u64)
                 .read_to_end(&mut decoded)
                 .unwrap();
-            assert_eq!(decoded, original);
+            assert!(
+                decoded == original,
+                "Decoded {format} output changed (is_wii={is_wii}, fast={fast})"
+            );
             outputs.push(bytes);
         }
         assert_eq!(outputs[0], outputs[1], "{format}");

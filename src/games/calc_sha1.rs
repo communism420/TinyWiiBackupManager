@@ -1,14 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Manuel Quarneti <mq1@ik.me>
 // SPDX-License-Identifier: GPL-3.0-only
 
-use crate::{
-    games::{
-        disc_reader::{SharedMultiFileReader, retrieve_multi_disc_files},
-        game::Game,
-    },
-    long_operation::LongOperationState,
-    util::{misc::OPTIMAL_THREADS, sha1_list},
-};
+use crate::{games::game::Game, long_operation::LongOperationState, util::sha1_list};
 use anyhow::{Context, Result};
 use nod::{
     read::{DiscOptions, DiscReader},
@@ -93,15 +86,27 @@ pub enum BatchHashEvent {
 }
 
 fn hash_disc(source: &Path, mut progress: impl FnMut(u64)) -> Result<[u8; 20]> {
-    let files = retrieve_multi_disc_files(source).context("opening source disc")?;
-    let stream = SharedMultiFileReader::new(files)?;
-    let reader = DiscReader::new_stream(
-        Box::new(stream),
-        &DiscOptions {
-            preloader_threads: OPTIMAL_THREADS.preloader,
-            ..Default::default()
-        },
-    )?;
+    // Require a continuation for .part0.iso, while preserving nod's priority
+    // for dotted .iso.1 continuations and its discovery of later parts.
+    if let Some(base) = source
+        .file_name()
+        .and_then(|name| name.to_str())
+        .and_then(|name| name.strip_suffix(".part0.iso"))
+    {
+        let dotted_part = source.with_file_name(format!("{base}.part0.iso.1"));
+        let has_dotted_part = match std::fs::metadata(&dotted_part) {
+            Ok(metadata) => metadata.is_file(),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => false,
+            Err(error) => return Err(error).context("checking source continuation"),
+        };
+        if !has_dotted_part {
+            drop(
+                std::fs::File::open(source.with_file_name(format!("{base}.part1.iso")))
+                    .context("opening source disc")?,
+            );
+        }
+    }
+    let reader = DiscReader::new(source, &DiscOptions::default()).context("opening source disc")?;
     // Hash the reconstructed ISO data, without writing an output image.
     let writer = DiscWriter::new(reader, &FormatOptions::default())?;
     let mut previous_percentage = None;
@@ -299,6 +304,74 @@ mod tests {
             output.write_all(&finalization.header).unwrap();
         }
         output.into_inner()
+    }
+
+    fn assert_split_hash(names: &[&str], chunk_size: usize) {
+        let dir = tempfile::tempdir().unwrap();
+        let data = synthetic_disc();
+        let mut offset = 0;
+        let mut parts = Vec::new();
+        for (index, name) in names.iter().enumerate() {
+            let end = if index + 1 == names.len() {
+                data.len()
+            } else {
+                offset + chunk_size
+            };
+            let bytes = &data[offset..end];
+            let path = dir.path().join(name);
+            std::fs::write(&path, bytes).unwrap();
+            parts.push((path, bytes));
+            offset = end;
+        }
+        let digest = hash_disc(&parts[0].0, |_| {}).unwrap();
+        let sha1: String = digest.iter().map(|byte| format!("{byte:02x}")).collect();
+        for (path, bytes) in parts {
+            assert_eq!(std::fs::read(path).unwrap(), bytes);
+        }
+        assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), names.len());
+        assert_eq!(sha1, SYNTHETIC_SHA1);
+    }
+
+    #[test]
+    fn hash_supports_upstream_iso_numbered_parts() {
+        assert_split_hash(&["game.iso", "game.iso.1", "game.iso.2"], 0x4000);
+    }
+
+    #[test]
+    fn hash_supports_upstream_numbered_part_zero_continuations() {
+        assert_split_hash(&["game.part0.iso", "game.part0.iso.1"], 0x8000);
+    }
+    #[test]
+    fn hash_supports_upstream_more_than_four_iso_parts() {
+        assert_split_hash(
+            &[
+                "game.part0.iso",
+                "game.part1.iso",
+                "game.part2.iso",
+                "game.part3.iso",
+                "game.part4.iso",
+                "game.part5.iso",
+            ],
+            0x2000,
+        );
+    }
+    #[test]
+    fn hash_joins_three_iso_parts_and_preserves_source() {
+        let dir = tempfile::tempdir().unwrap();
+        let data = synthetic_disc();
+        let parts = [&data[..0x4000], &data[0x4000..0x8000], &data[0x8000..]];
+        for (index, bytes) in parts.iter().enumerate() {
+            std::fs::write(dir.path().join(format!("game.part{index}.iso")), bytes).unwrap();
+        }
+        let digest = hash_disc(&dir.path().join("game.part0.iso"), |_| {}).unwrap();
+        let sha1: String = digest.iter().map(|byte| format!("{byte:02x}")).collect();
+        assert_eq!(sha1, SYNTHETIC_SHA1);
+        for (index, bytes) in parts.iter().enumerate() {
+            assert_eq!(
+                std::fs::read(dir.path().join(format!("game.part{index}.iso"))).unwrap(),
+                *bytes
+            );
+        }
     }
 
     #[test]

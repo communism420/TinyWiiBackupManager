@@ -1,12 +1,12 @@
 [package]
 name = "TinyWiiBackupManager"
-version = "6.1.6"
+version = "6.1.7"
 edition = "2024"
 rust-version = "1.98"
 authors = ["Manuel Quarneti <mq1@ik.me>"]
 license = "GPL-3.0-only"
-repository = "https://github.com/mq1/TinyWiiBackupManager"
-description = "A tiny game backup and homebrew app manager for the Wii"
+repository = "https://github.com/communism420/TinyWiiBackupManagerPlus"
+description = "TinyWiiBackupManagerPlus: a fork with batch transfers, cancellation and integrity checks"
 
 [features]
 default = ["minreq/https-rustls", "static-nod", "dialogs-rfd"]
@@ -58,15 +58,15 @@ split-write = "0.2"
 tempfile = "3"
 arrayvec = { version = "0.7", features = ["serde"] }
 zip = { version = "9", default-features = false, features = [
-  "deflate-flate2-zlib",
+  "deflate-flate2-zlib-rs",
 ] }
 strum = "0.28"
 strum_macros = "0.28"
-wiiload = { version = "0.5", features = ["async"] }
+wiiload = { version = "0.7", features = ["async", "compression-async"] }
 anyhow = "1"
 time = { version = "0.3", features = ["local-offset"] }
 minreq = { version = "3", features = ["json-using-serde"] }
-# Preserve original Wii hash areas in WIA/RVZ; see vendor/nod/PATCHES.md.
+# Bundled integrity fixes; provenance is recorded in vendor/nod/PATCHES.md.
 nod = { path = "vendor/nod", default-features = false, features = [
   "threading",
   "compress-bzip2",

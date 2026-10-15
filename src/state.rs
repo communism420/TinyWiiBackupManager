@@ -6,7 +6,6 @@ use crate::{
     games::{
         ImportEntry,
         covers::download_ui_covers,
-        export::ExportCancellation,
         game::Game,
         games_state::GamesState,
         import::{DEFAULT_PARALLEL_IMPORTS, ImportCancellation, import_games},
@@ -37,7 +36,7 @@ use nod::{
 use semver::Version;
 use smol::{
     fs::{self, File},
-    io::AsyncSeekExt,
+    io::{AsyncSeekExt, BufReader},
     net::TcpStream,
 };
 use std::{
@@ -47,13 +46,6 @@ use std::{
 };
 use wii_disc_info::game_id::GameID;
 use wiiload::WIILOAD_PORT;
-
-#[derive(Debug, Clone)]
-pub struct ExportRun {
-    pub id: u64,
-    pub fast_transfer: bool,
-    pub cancellation: ExportCancellation,
-}
 
 #[derive(Debug, Clone)]
 pub struct QueuedImport {
@@ -78,6 +70,10 @@ pub struct AppState {
     pub notifications: NotificationList,
     pub drive: DriveState,
     pub games: GamesState,
+    pub export_picker: Option<u64>,
+    export_picker_sequence: u64,
+    pub active_export: Option<ExportRun>,
+    export_run_sequence: u64,
     pub homebrew: HomebrewState,
     pub current_page: Page,
     pub current_modal: Option<Modal>,
@@ -87,13 +83,10 @@ pub struct AppState {
     pub active_import: Option<ImportRun>,
     import_queue_sequence: u64,
     import_run_sequence: u64,
+
     pub osc_contents: OscState,
     pub animation_state: bool,
     pub new_version: Option<Version>,
-    pub export_picker: Option<u64>,
-    export_picker_sequence: u64,
-    pub active_export: Option<ExportRun>,
-    export_run_sequence: u64,
     pub hash_batch: Option<HashSelection>,
     hash_run_sequence: u64,
 }
@@ -108,6 +101,10 @@ impl AppState {
                     notifications: NotificationList::new(data_dir),
                     drive: DriveState::NotLoaded,
                     games: GamesState::NotLoaded,
+                    export_picker: None,
+                    export_picker_sequence: 0,
+                    active_export: None,
+                    export_run_sequence: 0,
                     homebrew: HomebrewState::NotLoaded,
                     current_page: Page::Games,
                     current_modal: None,
@@ -119,10 +116,6 @@ impl AppState {
                     osc_contents: OscState::NotLoaded,
                     animation_state: false,
                     new_version: None,
-                    export_picker: None,
-                    export_picker_sequence: 0,
-                    active_export: None,
-                    export_run_sequence: 0,
                     hash_batch: None,
                     hash_run_sequence: 0,
                     long_operations: LongOperations::new(),
@@ -144,33 +137,6 @@ impl AppState {
                 ]),
             )
         }
-    }
-
-    pub fn is_export_busy(&self) -> bool {
-        self.export_picker.is_some()
-            || self.active_export.is_some()
-            || !self.long_operations.is_idle(LongOperationKind::Export)
-    }
-
-    pub fn can_change_fast_transfer(&self) -> bool {
-        !self.is_import_busy() && !self.is_export_busy()
-    }
-
-    pub fn is_export_cancelling(&self) -> bool {
-        self.active_export
-            .as_ref()
-            .is_some_and(|run| run.cancellation.is_cancelled())
-    }
-
-    pub fn begin_export_run(&mut self) -> ExportRun {
-        self.export_run_sequence = self.export_run_sequence.wrapping_add(1);
-        let run = ExportRun {
-            id: self.export_run_sequence,
-            fast_transfer: self.config.fast_transfer(),
-            cancellation: ExportCancellation::default(),
-        };
-        self.active_export = Some(run.clone());
-        run
     }
 
     pub fn is_hash_busy(&self) -> bool {
@@ -207,32 +173,6 @@ impl AppState {
         {
             self.hash_batch = None;
         }
-    }
-
-    pub fn dismiss_export_selection(&mut self) {
-        self.export_picker = None;
-        if matches!(self.current_modal, Some(Modal::ExportGames(_))) {
-            self.current_modal = None;
-        }
-    }
-
-    pub fn begin_export_picker(&mut self) -> Option<u64> {
-        if self.is_export_busy() {
-            return None;
-        }
-
-        self.export_picker_sequence = self.export_picker_sequence.wrapping_add(1);
-        self.export_picker = Some(self.export_picker_sequence);
-        self.export_picker
-    }
-
-    pub fn finish_export_picker(&mut self, request: u64) -> bool {
-        if self.export_picker != Some(request) {
-            return false;
-        }
-
-        self.export_picker = None;
-        true
     }
 
     pub fn subscription(&self) -> Subscription<Message> {
@@ -537,8 +477,8 @@ impl AppState {
                         excluded_files.len()
                     )
                 } else {
-                    let mut file = File::open(&path).await?;
-                    wiiload::compress_then_send_async(&mut conn, &filename, &mut file).await?;
+                    let mut reader = BufReader::new(File::open(path).await?);
+                    wiiload::compress_then_send_async(&mut conn, &filename, &mut reader).await?;
 
                     format!("Sent {filename} to {wii_ip}")
                 };
@@ -575,5 +515,67 @@ impl AppState {
             self.get_homebrew_apps_task(),
             self.get_drive_info_task(),
         ])
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct ExportRun {
+    pub id: u64,
+    pub fast_transfer: bool,
+    pub cancellation: crate::games::export::ExportCancellation,
+}
+
+impl AppState {
+    pub fn is_export_busy(&self) -> bool {
+        self.export_picker.is_some()
+            || self.active_export.is_some()
+            || !self.long_operations.is_idle(LongOperationKind::Export)
+    }
+
+    pub fn can_change_fast_transfer(&self) -> bool {
+        !self.is_import_busy() && !self.is_export_busy()
+    }
+
+    pub fn is_export_cancelling(&self) -> bool {
+        self.active_export
+            .as_ref()
+            .is_some_and(|run| run.cancellation.is_cancelled())
+    }
+
+    pub fn begin_export_run(&mut self) -> ExportRun {
+        self.export_run_sequence = self.export_run_sequence.wrapping_add(1);
+        let run = ExportRun {
+            id: self.export_run_sequence,
+            fast_transfer: self.config.fast_transfer(),
+            cancellation: crate::games::export::ExportCancellation::default(),
+        };
+        self.active_export = Some(run.clone());
+        run
+    }
+
+    pub fn dismiss_export_selection(&mut self) {
+        self.export_picker = None;
+        if matches!(self.current_modal, Some(Modal::ExportGames(_))) {
+            self.current_modal = None;
+        }
+    }
+
+    pub fn begin_export_picker(&mut self) -> Option<u64> {
+        if self.is_export_busy() {
+            return None;
+        }
+
+        self.export_picker_sequence = self.export_picker_sequence.wrapping_add(1);
+        self.export_picker = Some(self.export_picker_sequence);
+        self.export_picker
+    }
+
+    pub fn finish_export_picker(&mut self, request: u64) -> bool {
+        if self.export_picker != Some(request) {
+            return false;
+        }
+
+        self.export_picker = None;
+        true
     }
 }

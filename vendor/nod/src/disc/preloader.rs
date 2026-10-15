@@ -288,9 +288,7 @@ impl Preloader {
     }
 
     #[allow(unused)]
-    pub fn shutdown(self) {
-        drop(self);
-    }
+    pub fn shutdown(self) { drop(self); }
 
     #[instrument(name = "Preloader::fetch", skip_all)]
     pub fn fetch(&self, request: SectorGroupRequest, max_groups: u32) -> SectorGroupResult {
@@ -742,14 +740,16 @@ mod shutdown_tests {
                     requests.recv_timeout(Duration::from_secs(2)),
                     Err(crossbeam_channel::RecvTimeoutError::Disconnected)
                 ));
-                assert!(stats
-                    .send(PreloaderThreadStats {
-                        thread_id,
-                        wait_time: Duration::ZERO,
-                        req_time: Duration::ZERO,
-                        io_time: Duration::ZERO,
-                    })
-                    .is_err());
+                assert!(
+                    stats
+                        .send(PreloaderThreadStats {
+                            thread_id,
+                            wait_time: Duration::ZERO,
+                            req_time: Duration::ZERO,
+                            io_time: Duration::ZERO,
+                        })
+                        .is_err()
+                );
                 finished.fetch_add(1, Ordering::SeqCst);
             });
             preloader.threads.get_mut().unwrap().join_handles.push(handle);

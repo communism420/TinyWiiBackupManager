@@ -33,7 +33,10 @@ pub fn about(state: &AppState) -> Element<'_, Message> {
         my_link("Luke Street", "https://github.com/encounter").icon(Icon::Triangle);
     let blackb0x_link = my_link("blackb0x", "https://github.com/wiidev").icon(Icon::Wand2);
     let data_dir_link = my_link("Data directory", &state.data_dir).icon(Icon::Folder);
-    let source_code_link = my_link("Source code", "https://github.com/mq1/TinyWiiBackupManager");
+    let source_code_link = my_link(
+        "Source code",
+        "https://github.com/communism420/TinyWiiBackupManagerPlus",
+    );
     let wiki_link = my_link("Wiki", "https://github.com/mq1/TinyWiiBackupManager/wiki");
 
     column![

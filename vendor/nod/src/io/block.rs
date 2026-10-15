@@ -426,3 +426,33 @@ pub fn generate_junk_sector(
         pos,
     );
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn last_sector_hash_exceptions_are_preserved_and_rebased() {
+        let previous = WIAException { offset: 0xf800.into(), hash: [1; 20] };
+        let first = WIAException { offset: 0xfc00.into(), hash: [2; 20] };
+        let last = WIAException { offset: 0xffec.into(), hash: [3; 20] };
+        let mut block = Block::sectors(100, 64, BlockKind::Raw);
+        block.hash_exceptions =
+            vec![vec![previous, first.clone(), last.clone()].into_boxed_slice()].into_boxed_slice();
+
+        let mut out = Vec::new();
+        block.append_hash_exceptions(163, 0, &mut out).unwrap();
+        assert_eq!(out, vec![WIAException { offset: 0.into(), hash: first.hash }, WIAException {
+            offset: 0x03ec.into(),
+            hash: last.hash
+        },]);
+
+        out.clear();
+        block.append_hash_exceptions(163, 63, &mut out).unwrap();
+        assert_eq!(out, vec![first, last]);
+
+        out.clear();
+        block.append_hash_exceptions(162, 7, &mut out).unwrap();
+        assert_eq!(out, vec![WIAException { offset: 0x1c00.into(), hash: [1; 20] }]);
+    }
+}

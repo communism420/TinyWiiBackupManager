@@ -3,10 +3,7 @@
 
 use crate::{
     config::{Config, message::ConfigMessage},
-    games::{
-        ImportEntry, calc_sha1::BatchHashEvent, export::ExportFormat, game::Game,
-        games_state::GamesState, import::BatchImportEvent,
-    },
+    games::{ImportEntry, game::Game, games_state::GamesState},
     homebrew::{homebrew_app::HomebrewApp, homebrew_state::HomebrewState},
     long_operation::{LongOperationKind, LongOperationState},
     notifications::notification::Notification,
@@ -53,7 +50,7 @@ pub enum Message {
     ToggleHashGame(usize, bool),
     SelectAllHashGames(bool),
     CheckSelectedGames,
-    HashBatchUpdated(u64, BatchHashEvent),
+    HashBatchUpdated(u64, crate::games::calc_sha1::BatchHashEvent),
     PickGames,
     PickGamesRecursively,
     PickedGames(Vec<ImportEntry>),
@@ -63,7 +60,7 @@ pub enum Message {
     ToggleImportGame(u64, bool),
     SelectAllImportGames(bool),
     SetImportParallelJobs(usize),
-    ImportBatchUpdated(u64, BatchImportEvent),
+    ImportBatchUpdated(u64, crate::games::import::BatchImportEvent),
     ToggleAnimationState,
     ReloadCover(GameID),
     ReloadOscIcon(usize),
@@ -78,7 +75,7 @@ pub enum Message {
     OpenExportGames,
     ToggleExportGame(usize, bool),
     SelectAllExportGames(bool),
-    SetExportFormat(ExportFormat),
+    SetExportFormat(crate::games::export::ExportFormat),
     SetExportParallelJobs(usize),
     PickBatchExportDestination,
     BatchExportDestinationPicked(u64, Option<PathBuf>),

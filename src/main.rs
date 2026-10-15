@@ -9,8 +9,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod config;
-#[cfg(test)]
-mod export_tests;
 mod games;
 #[cfg(test)]
 mod hash_tests;
@@ -132,3 +130,6 @@ pub fn main() -> iced::Result {
         .theme(AppState::theme)
         .run()
 }
+
+#[cfg(test)]
+mod export_tests;

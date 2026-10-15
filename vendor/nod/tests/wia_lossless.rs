@@ -105,15 +105,13 @@ fn assert_image_lossless(
     threaded: bool,
 ) {
     let encrypted = original[0x61] == 0;
-    let reader = DiscReader::new_stream(
-        Box::new(Arc::<[u8]>::from(original.clone())),
-        &DiscOptions {
+    let reader =
+        DiscReader::new_stream(Box::new(Arc::<[u8]>::from(original.clone())), &DiscOptions {
             #[cfg(feature = "threading")]
             preloader_threads: 2,
             ..Default::default()
-        },
-    )
-    .unwrap();
+        })
+        .unwrap();
     assert!(!reader.partitions().is_empty());
     assert!(reader.partitions().iter().all(|partition| partition.fst().is_some()));
     let writer =

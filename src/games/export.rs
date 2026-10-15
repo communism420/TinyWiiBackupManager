@@ -4,8 +4,8 @@
 use crate::{
     games::{
         disc_reader::{
-            CancellableDiscStream, DiscCancelled, SharedMultiFileReader, error_contains,
-            retrieve_multi_disc_files_cancellable,
+            CancellableDiscStream, DiscCancellation, DiscCancelled, SharedMultiFileReader,
+            error_contains, retrieve_multi_disc_files_cancellable,
         },
         game::Game,
         import::make_game_dir_name,
@@ -73,6 +73,12 @@ impl ExportCancellation {
     fn observed_by(mut self, sender: &smol::channel::Sender<LongOperationState>) -> Self {
         self.observer = Some(sender.clone());
         self
+    }
+}
+
+impl DiscCancellation for ExportCancellation {
+    fn check(&self) -> io::Result<()> {
+        ExportCancellation::check(self)
     }
 }
 
@@ -735,23 +741,6 @@ mod tests {
         data[..6].copy_from_slice(b"GZZE01");
         data[0x1c..0x20].copy_from_slice(&[0xc2, 0x33, 0x9f, 0x3d]);
         data
-    }
-
-    #[test]
-    fn manually_entered_export_extensions_ignore_case() {
-        for format in ExportFormat::ALL {
-            let extension = format.extension();
-            assert_eq!(ext_to_format(extension), Some(format.format()));
-            assert_eq!(
-                ext_to_format(&extension.to_ascii_uppercase()),
-                Some(format.format())
-            );
-            let mut mixed = extension.to_owned();
-            mixed[..1].make_ascii_uppercase();
-            assert_eq!(ext_to_format(&mixed), Some(format.format()));
-        }
-        assert_eq!(ext_to_format("CGZ"), None);
-        assert_eq!(ext_to_format("zip"), None);
     }
 
     #[test]

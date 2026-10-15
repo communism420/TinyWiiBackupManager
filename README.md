@@ -1,9 +1,10 @@
 <img alt="TinyWiiBackupManager Logo" width="128" src="assets/TinyWiiBackupManager-256x256.png" align="left">
 
-### `TinyWiiBackupManager`<br><sub><sup>:star: A tiny game backup and homebrew app manager for the Wii</sup></sub>
+### `TinyWiiBackupManagerPlus`<br><sub><sup>:star: A tiny game backup and homebrew app manager for the Wii</sup></sub>
 
-[![release: vX.X.X](https://img.shields.io/github/v/release/mq1/TinyWiiBackupManager)](https://github.com/mq1/TinyWiiBackupManager/releases/latest)
-[![license: GPL-3.0](https://img.shields.io/github/license/mq1/TinyWiiBackupManager)](https://github.com/mq1/TinyWiiBackupManager/blob/main/COPYING)
+[![license: GPL-3.0](https://img.shields.io/github/license/communism420/TinyWiiBackupManagerPlus)](https://github.com/communism420/TinyWiiBackupManagerPlus/blob/main/COPYING)
+
+TinyWiiBackupManagerPlus is a fork of [TinyWiiBackupManager](https://github.com/mq1/TinyWiiBackupManager), originally developed by Manuel Quarneti and its contributors. We welcome useful, safe changes that preserve existing functionality, whether made with AI or without it. What matters is the benefit and quality of the result. See our [contribution policy](AI_POLICY.md).
 
 <br>
 
@@ -48,49 +49,15 @@
 
 ## :arrow_down: Downloads
 
-<table>
-  <tr>
-    <td width="9999px"><strong>:window: Windows</strong></td>
-  </tr>
-  <tr>
-    <td>
-      :arrow_right: <a href="https://github.com/mq1/TinyWiiBackupManager/releases/latest">Download standalone binary</a>
-      <br>
-      <br>
-      :package: <code>winget install -e --id mq1.TinyWiiBackupManager</code>
-    </td>
-  </tr>
-</table>
+No TinyWiiBackupManagerPlus release has been published yet. Future builds will be available on the [fork's releases page](https://github.com/communism420/TinyWiiBackupManagerPlus/releases).
 
-<table>
-  <tr>
-    <td width="9999px"><strong>:apple: macOS</strong></td>
-  </tr>
-  <tr>
-    <td>
-      :arrow_right: <a href="https://github.com/mq1/TinyWiiBackupManager/releases/latest">Download universal DMG</a>
-    </td>
-  </tr>
-</table>
-
-<table>
-  <tr>
-    <td width="9999px"><strong>:penguin: Linux</strong></td>
-  </tr>
-  <tr>
-    <td>
-      :arrow_right: <a href="https://flathub.org/apps/it.mq1.TinyWiiBackupManager">Download on Flathub</a> (recommended for most users)
-      <br>
-      :arrow_right: <a href="https://github.com/mq1/TinyWiiBackupManager/releases/latest">Download AppImage</a>
-    </td>
-  </tr>
-</table>
+For the original project, see [TinyWiiBackupManager releases](https://github.com/mq1/TinyWiiBackupManager/releases/latest), [Flathub](https://flathub.org/apps/it.mq1.TinyWiiBackupManager), or `winget install -e --id mq1.TinyWiiBackupManager`. These install the original application and do not include this fork's changes.
 
 <br>
 
 ## :page_facing_up: Additional Info
 
-For useful tips, check out the [Wiki](https://github.com/mq1/TinyWiiBackupManager/wiki)
+For useful tips, check out the [original project Wiki](https://github.com/mq1/TinyWiiBackupManager/wiki)
 
 <br>
 <br>

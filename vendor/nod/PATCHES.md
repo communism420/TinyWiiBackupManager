@@ -1,13 +1,35 @@
-# Local nod patch: preserve Wii hashes in WIA/RVZ exports
+# Local nod patches: lossless conversion and cancellation cleanup
 
-This directory contains the `nod` crate from
+This directory contains the `nod` crate based on
 `https://github.com/wiidev/nod`, branch `fix-block-handling`, commit
 `9a7a6b2ef0a1036ff687f8e8ce0d0238064d4aaf` (`2.0.0-alpha.10`).
-The upstream crate sources, README and MIT/Apache-2.0 licenses are preserved.
+The crate sources and tests match the local integration snapshot
+`6590d85b67f9a32aaecebca8ca34f1f6b5b83df9`, which applies the patches listed
+below to that base. This snapshot is recorded for provenance; it is not a
+published revision or an external build dependency. The upstream README and
+MIT/Apache-2.0 licenses are preserved.
 `Cargo.toml` expands inherited workspace package/dependency values without
 changing their versions or features; its README path is local to this directory.
 The Python package files and the other upstream workspace members are not needed
-by TinyWiiBackupManager and are not vendored.
+by TinyWiiBackupManagerPlus and are not vendored.
+
+## Patch provenance
+
+The following local history commits, in order, are included after the upstream
+base. Their complete source changes are present in this directory, so these
+commit identifiers do not need to be available in a remote repository:
+
+- `4b515c5a16c540119a0d92cd46c80037d6eefcb2`: retain WIA hash exceptions in sector 63.
+- `53ee9250ee57d55dbcb7c564cbdcadfb5cb2f0d1`: disconnect and join preloader workers on shutdown.
+- `f388177ee70e03e229ec2ba0cdf5f204e6b4dc1a`: join all digest workers on finish and drop.
+- `78ebad4d595052fbc4799eab0fa161c143422906`: expose split image component paths.
+- `420af0f8d4ff5dd5eeda5f398de748244661c0a4`: preserve original Wii hash areas in WIA and RVZ output.
+- `b7afec9cab32ca322e5949398fc94136dbd1b43f`: report WIA progress when groups write no output.
+- `6590d85b67f9a32aaecebca8ca34f1f6b5b83df9`: format the sector boundary regression.
+
+The application uses this repository-relative crate directly, so a clean clone
+does not need a developer-specific dependency override. Build artifacts, private
+disc images, and other upstream workspace members are not included.
 
 ## Why the patch is needed
 
@@ -44,6 +66,8 @@ must preserve the decoded input bytes, including nonstandard or invalid hashes.
 - Add focused unit and public-API round-trip tests for preservation of unusual
   hashes and padding, including small RVZ chunks, the last sector of a group,
   partial final groups, encryption and compressed output.
+- The sector-63 unit regression verifies exception range selection and rebasing
+  at the final sector boundary; `tests/wia_lossless.rs` uses synthetic discs.
 
 These changes are kept in source control instead of modifying Cargo's shared
 cache. The vendored dependency can be removed after a suitable upstream fix is
@@ -78,3 +102,7 @@ available and equivalent round-trip coverage passes against it.
   workers, and preservation of normal digest results. Export cancellation is
   cooperative: an already executing OS read or codec call finishes before the
   next checkpoint.
+- `tests/wia_progress.rs` uses synthetic empty and repeated groups to check
+  progress callbacks and cancellation errors at group and finalization
+  checkpoints. `DataCallback` documents that these callbacks can contain no
+  output bytes.

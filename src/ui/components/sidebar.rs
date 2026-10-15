@@ -57,11 +57,12 @@ pub fn sidebar(state: &AppState) -> Element<'_, Message> {
             tooltip(
                 my_sidebar_button(&[Icon::BellPlus]).on_press_with(|| {
                     Message::Open(
-                        "https://github.com/mq1/TinyWiiBackupManager/releases/latest".into(),
+                        "https://github.com/communism420/TinyWiiBackupManagerPlus/releases/latest"
+                            .into(),
                     )
                 }),
                 my_card(text!(
-                    "New TinyWiiBackupManager version available: {new_version}"
+                    "New TinyWiiBackupManagerPlus version available: {new_version}"
                 )),
                 tooltip::Position::Right,
             )

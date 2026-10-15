@@ -140,8 +140,13 @@ mod multi_threaded {
 
     #[cfg(test)]
     mod shutdown_tests {
-        use std::sync::{Arc, atomic::{AtomicUsize, Ordering}};
-        use std::time::Duration;
+        use std::{
+            sync::{
+                Arc,
+                atomic::{AtomicUsize, Ordering},
+            },
+            time::Duration,
+        };
 
         use super::*;
 
@@ -196,10 +201,13 @@ mod multi_threaded {
             manager.send(Bytes::from_static(b"bc"));
             let results = manager.finish();
             assert_eq!(results.crc32, Some(0x352441c2));
-            assert_eq!(results.sha1, Some([
-                0xa9, 0x99, 0x3e, 0x36, 0x47, 0x06, 0x81, 0x6a, 0xba, 0x3e,
-                0x25, 0x71, 0x78, 0x50, 0xc2, 0x6c, 0x9c, 0xd0, 0xd8, 0x9d,
-            ]));
+            assert_eq!(
+                results.sha1,
+                Some([
+                    0xa9, 0x99, 0x3e, 0x36, 0x47, 0x06, 0x81, 0x6a, 0xba, 0x3e, 0x25, 0x71, 0x78,
+                    0x50, 0xc2, 0x6c, 0x9c, 0xd0, 0xd8, 0x9d,
+                ])
+            );
         }
     }
 }

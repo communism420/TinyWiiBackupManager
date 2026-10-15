@@ -4,14 +4,8 @@
 use crate::{
     config::message::ConfigMessage,
     games::{
-        ImportEntry,
-        calc_sha1::{BatchHashEvent, calc_sha1, calc_sha1_games},
-        convert::convert_game,
-        export::{MAX_PARALLEL_EXPORTS, export_game, export_games},
-        games_state::GamesState,
-        import::{BatchImportEvent, MAX_PARALLEL_IMPORTS},
-        scrub::scrub_game,
-        txtcodes::download_cheats,
+        ImportEntry, calc_sha1::calc_sha1, convert::convert_game, export::export_game,
+        games_state::GamesState, scrub::scrub_game, txtcodes::download_cheats,
     },
     homebrew::homebrew_state::HomebrewState,
     long_operation::{LongOperationKind, LongOperationState},
@@ -31,6 +25,23 @@ const NEW_DRIVE_TEXT: &str = "New drive detected (or a breaking TWBM update has 
 
 impl AppState {
     pub fn update(&mut self, message: Message) -> Task<Message> {
+        let mut message = message;
+        if let Message::GotConfig(config) = &mut message
+            && !self.can_change_fast_transfer()
+        {
+            // Preserve the setting before mount changes can dismiss a busy picker.
+            drop(config.update(ConfigMessage::SetFastTransfer(self.config.fast_transfer())));
+        }
+        match &message {
+            Message::Config(ConfigMessage::SetMountPoint(_)) | Message::MountPointPicked(_) => {
+                self.dismiss_export_selection();
+            }
+            Message::GotConfig(config) if self.config.mount_point() != config.mount_point() => {
+                self.dismiss_export_selection();
+            }
+            _ => {}
+        }
+
         match message {
             Message::Config(message) => {
                 if matches!(message, ConfigMessage::SetFastTransfer(_))
@@ -39,10 +50,7 @@ impl AppState {
                     return Task::none();
                 }
                 match &message {
-                    ConfigMessage::SetMountPoint(_) => {
-                        self.dismiss_export_selection();
-                        self.dismiss_hash_selection();
-                    }
+                    ConfigMessage::SetMountPoint(_) => self.dismiss_hash_selection(),
                     ConfigMessage::Written(Err(e)) => {
                         self.notifications.push(Notification::error(e));
                     }
@@ -73,7 +81,6 @@ impl AppState {
                 dialogs::init_file_dialog_task().then(dialogs::make_pick_mount_point_dialog_task)
             }
             Message::MountPointPicked(path) => {
-                self.dismiss_export_selection();
                 self.dismiss_hash_selection();
                 Task::batch([
                     self.config
@@ -87,16 +94,8 @@ impl AppState {
                 Task::none()
             }
             Message::RefreshGamesAndApps => self.refresh_games_and_apps(),
-            Message::GotConfig(mut config) => {
-                if !self.can_change_fast_transfer() {
-                    // A delayed configuration load cannot change the setting shown
-                    // for a running transfer or a pending native destination dialog.
-                    drop(
-                        config.update(ConfigMessage::SetFastTransfer(self.config.fast_transfer())),
-                    );
-                }
+            Message::GotConfig(config) => {
                 if self.config.mount_point() != config.mount_point() {
-                    self.dismiss_export_selection();
                     self.dismiss_hash_selection();
                 }
                 self.config = config;
@@ -243,7 +242,7 @@ impl AppState {
                         LongOperationState::Progress(selection.progress.clone()),
                     );
                 }
-                Task::stream(calc_sha1_games(games))
+                Task::stream(crate::games::calc_sha1::calc_sha1_games(games))
                     .map(move |event| Message::HashBatchUpdated(run_id, event))
             }
             Message::HashBatchUpdated(run_id, event) => {
@@ -254,15 +253,17 @@ impl AppState {
                     return Task::none();
                 }
                 match event {
-                    BatchHashEvent::Progress(progress) => {
+                    crate::games::calc_sha1::BatchHashEvent::Progress(progress) => {
                         selection.progress = progress.clone();
                         self.long_operations.set(
                             LongOperationKind::Hash,
                             LongOperationState::Progress(progress),
                         );
                     }
-                    BatchHashEvent::Result(result) => selection.results.push(result),
-                    BatchHashEvent::Finished(summary) => {
+                    crate::games::calc_sha1::BatchHashEvent::Result(result) => {
+                        selection.results.push(result)
+                    }
+                    crate::games::calc_sha1::BatchHashEvent::Finished(summary) => {
                         let notification = if summary.errors > 0 {
                             Notification::error(&summary)
                         } else if summary.unknown > 0 {
@@ -355,11 +356,14 @@ impl AppState {
             }
             Message::SetImportParallelJobs(jobs) => {
                 if !self.is_import_busy() {
-                    self.import_parallel_jobs = jobs.clamp(1, MAX_PARALLEL_IMPORTS);
+                    self.import_parallel_jobs =
+                        jobs.clamp(1, crate::games::import::MAX_PARALLEL_IMPORTS);
                 }
                 Task::none()
             }
             Message::ImportBatchUpdated(run_id, event) => {
+                use crate::games::import::BatchImportEvent;
+
                 let Some(run) = &mut self.active_import else {
                     return Task::none();
                 };
@@ -546,6 +550,8 @@ impl AppState {
                 self.notifications.push(notification);
                 Task::none()
             }
+            // Export events require the run ID to reject stale tasks.
+            Message::SetLongOperationState(LongOperationKind::Export, _) => Task::none(),
             Message::OpenExportGames => {
                 if !self.is_export_busy()
                     && !self.config.mount_point().as_os_str().is_empty()
@@ -586,7 +592,8 @@ impl AppState {
                 if self.export_picker.is_none()
                     && let Some(Modal::ExportGames(selection)) = &mut self.current_modal
                 {
-                    selection.parallel_jobs = parallel_jobs.clamp(1, MAX_PARALLEL_EXPORTS);
+                    selection.parallel_jobs =
+                        parallel_jobs.clamp(1, crate::games::export::MAX_PARALLEL_EXPORTS);
                 }
                 Task::none()
             }
@@ -627,7 +634,7 @@ impl AppState {
                         games.len()
                     )),
                 );
-                Task::stream(export_games(
+                Task::stream(crate::games::export::export_games(
                     games,
                     destination,
                     format,
@@ -638,10 +645,7 @@ impl AppState {
                 .map(move |op_state| Message::ExportProgress(run.id, op_state))
             }
             Message::SetLongOperationState(op_kind, mut op_state) => {
-                if matches!(
-                    op_kind,
-                    LongOperationKind::Export | LongOperationKind::Import
-                ) {
+                if op_kind == LongOperationKind::Import {
                     // Batch events require the run ID so an old task cannot unlock a new run.
                     return Task::none();
                 }
@@ -652,7 +656,9 @@ impl AppState {
                 } else if let LongOperationState::Errored(error) = op_state {
                     self.notifications.push(Notification::error(error));
                     op_state = LongOperationState::Idle;
-                } else if let LongOperationState::Cancelled(summary) = op_state {
+                }
+
+                if let LongOperationState::Cancelled(summary) = op_state {
                     self.notifications.push(Notification::info(summary));
                     op_state = LongOperationState::Idle;
                 }

@@ -14,11 +14,11 @@ pub mod osc_app_info;
 
 #[derive(Debug, Clone)]
 pub enum Modal {
+    CheckGames,
     GameInfo((Game, Option<wii_disc_info::Meta>, bool)),
     HomebrewAppInfo(Box<HomebrewApp>),
     OscAppInfo(OscApp),
     DeleteDir(PathBuf),
     ConfirmScrub(Game),
     ExportGames(export_games::ExportSelection),
-    CheckGames,
 }
