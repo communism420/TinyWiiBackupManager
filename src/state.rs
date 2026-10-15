@@ -521,6 +521,7 @@ impl AppState {
 #[derive(Debug, Clone)]
 pub struct ExportRun {
     pub id: u64,
+    pub fast_transfer: bool,
     pub cancellation: crate::games::export::ExportCancellation,
 }
 
@@ -529,6 +530,10 @@ impl AppState {
         self.export_picker.is_some()
             || self.active_export.is_some()
             || !self.long_operations.is_idle(LongOperationKind::Export)
+    }
+
+    pub fn can_change_fast_transfer(&self) -> bool {
+        !self.is_import_busy() && !self.is_export_busy()
     }
 
     pub fn is_export_cancelling(&self) -> bool {
@@ -541,6 +546,7 @@ impl AppState {
         self.export_run_sequence = self.export_run_sequence.wrapping_add(1);
         let run = ExportRun {
             id: self.export_run_sequence,
+            fast_transfer: self.config.fast_transfer(),
             cancellation: crate::games::export::ExportCancellation::default(),
         };
         self.active_export = Some(run.clone());

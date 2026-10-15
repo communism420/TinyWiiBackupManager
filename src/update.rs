@@ -25,6 +25,13 @@ const NEW_DRIVE_TEXT: &str = "New drive detected (or a breaking TWBM update has 
 
 impl AppState {
     pub fn update(&mut self, message: Message) -> Task<Message> {
+        let mut message = message;
+        if let Message::GotConfig(config) = &mut message
+            && !self.can_change_fast_transfer()
+        {
+            // Preserve the setting before mount changes can dismiss a busy picker.
+            drop(config.update(ConfigMessage::SetFastTransfer(self.config.fast_transfer())));
+        }
         match &message {
             Message::Config(ConfigMessage::SetMountPoint(_)) | Message::MountPointPicked(_) => {
                 self.dismiss_export_selection();
@@ -37,6 +44,11 @@ impl AppState {
 
         match message {
             Message::Config(message) => {
+                if matches!(message, ConfigMessage::SetFastTransfer(_))
+                    && !self.can_change_fast_transfer()
+                {
+                    return Task::none();
+                }
                 match &message {
                     ConfigMessage::SetMountPoint(_) => self.dismiss_hash_selection(),
                     ConfigMessage::Written(Err(e)) => {
@@ -487,8 +499,13 @@ impl AppState {
                     LongOperationState::Progress(format!("Preparing to export {}", game.title())),
                 );
 
-                Task::stream(export_game(game, out_path, run.cancellation))
-                    .map(move |op_state| Message::ExportProgress(run.id, op_state))
+                Task::stream(export_game(
+                    game,
+                    out_path,
+                    run.fast_transfer,
+                    run.cancellation,
+                ))
+                .map(move |op_state| Message::ExportProgress(run.id, op_state))
             }
             Message::CancelExport => {
                 if let Some(run) = &self.active_export {
@@ -622,6 +639,7 @@ impl AppState {
                     destination,
                     format,
                     parallel_jobs,
+                    run.fast_transfer,
                     run.cancellation,
                 ))
                 .map(move |op_state| Message::ExportProgress(run.id, op_state))
