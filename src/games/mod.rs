@@ -24,6 +24,7 @@ pub mod games_state;
 pub mod import;
 pub mod scrub;
 pub mod txtcodes;
+pub(crate) mod zip_image;
 
 #[derive(Debug, Clone)]
 pub struct ImportEntry {
@@ -45,8 +46,9 @@ impl ImportEntry {
                 move || {
                     let f = std::fs::File::open(path)?;
                     let mut archive = ZipArchive::new(f)?;
-                    let mut first_entry = archive.by_index(0)?;
-                    let meta = wii_disc_info::Meta::read(&mut first_entry)?;
+                    let index = zip_image::game_index(&mut archive, || Ok(()))?;
+                    let mut image = archive.by_index(index)?;
+                    let meta = wii_disc_info::Meta::read(&mut image)?;
                     Ok::<_, anyhow::Error>(meta)
                 }
             })
@@ -98,6 +100,10 @@ impl PartialEq for ImportEntry {
 }
 
 impl Eq for ImportEntry {}
+
+#[cfg(test)]
+#[path = "zip_image/tests.rs"]
+mod zip_image_tests;
 
 impl PartialOrd for ImportEntry {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
