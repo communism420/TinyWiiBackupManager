@@ -18,8 +18,8 @@ TinyWiiBackupManagerPlus is a fork of [TinyWiiBackupManager](https://github.com/
 
 - **Lightweight & Fast**: Native app written in Rust and Iced, no Electron!
 - **Cross-Platform**:
-  - :window: Windows XP+ | x86 (32-bit), x64 (64-bit), arm64 (Qualcomm Snapdragon etc.)
-  - :apple: macOS 10.12+ | x86_64 (Intel), arm64 (Apple Silicon/M1+)
+  - :window: Windows | x86: XP+, x64: Vista+, ARM64: Windows 10+
+  - :apple: macOS | Intel: 10.12+, Apple Silicon: 11+
   - :penguin: Linux ~2020+ | x86 (32-bit), x86_64 (64-bit), arm64 (Raspberry PIs etc.)
 
 #### :video_game: Game Management
